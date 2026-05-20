@@ -1,4 +1,7 @@
 build/
 install/
 log/
-src
+src/*
+!src/AutoCarROS2
+!src/AutoCarROS2/**
+!src/commands.md
