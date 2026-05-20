@@ -1,0 +1,9 @@
+.git
+.gitmodules
+build/
+install/
+log/
+ROS2_Foxy_Container/runtime/
+ROS2_Foxy_Container/shared/
+**/__pycache__
+**/*.pyc

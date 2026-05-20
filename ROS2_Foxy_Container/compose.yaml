@@ -1,0 +1,20 @@
+services:
+  autocar-ros2:
+    build:
+      context: ..
+      dockerfile: ROS2_Foxy_Container/docker/Dockerfile
+    image: autocar/ros2-foxy-control:latest
+    container_name: autocar-ros2-foxy
+    environment:
+      API_PORT: "8001"
+      VNC_RESOLUTION: "1280x800"
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    ports:
+      - "6080:6080"
+      - "8001:8001"
+    volumes:
+      - ./shared:/workspace/shared
+      - ./runtime:/workspace/runtime
+    shm_size: "1gb"
+    tty: true
+    stdin_open: true

@@ -1,6 +1,10 @@
 build/
 install/
 log/
+runtime/*
+shared/*
+!runtime/.gitkeep
+!shared/.gitkeep
 src/*
 !src/AutoCarROS2
 !src/AutoCarROS2/**

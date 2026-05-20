@@ -126,7 +126,68 @@ Le sous-module est déclaré dans `.gitmodules` :
 	url = https://github.com/winstxnhdw/AutoCarROS2.git
 ```
 
-### Installer AutoCarROS2
+### Démarrage via conteneur ROS 2 Foxy
+
+Le dépôt fournit un conteneur ROS 2 Foxy Fitzroy + Gazebo 11 qui expose :
+
+- le bureau XFCE via noVNC : `http://localhost:6080`
+- l'API HTTP de contrôle : `http://localhost:8001/api/health`
+
+Depuis la racine du dépôt :
+
+```bash
+docker compose up --build
+```
+
+Puis ouvrir le bureau dans le navigateur :
+
+```text
+http://localhost:6080/vnc.html
+```
+
+Lancer la simulation autonome par API :
+
+```bash
+curl -X POST http://localhost:8001/api/sim/start \
+  -H "Content-Type: application/json" \
+  -d '{ "mode": "default" }'
+```
+
+Modes disponibles :
+
+| Mode | Usage |
+| --- | --- |
+| `default` | Lance `ros2 launch launches default_launch.py` avec la pile de navigation existante |
+| `click` | Lance `click_launch.py` et accepte des goals sur `/goal_pose` |
+| `gazebo` | Lance Gazebo seul, pratique pour les commandes manuelles sur `/autocar/cmd_vel` |
+
+Exemples API :
+
+```bash
+curl http://localhost:8001/api/status
+
+curl -X POST http://localhost:8001/api/command/manual \
+  -H "Content-Type: application/json" \
+  -d '{ "linear_x": 2.0, "angular_z": 0.2, "duration_sec": 3 }'
+
+curl -X POST http://localhost:8001/api/navigation/goal \
+  -H "Content-Type: application/json" \
+  -d '{ "x": 10.0, "y": 2.0, "yaw": 0.0 }'
+
+curl -X POST http://localhost:8001/api/sim/stop
+```
+
+Echange de fichiers :
+
+```bash
+curl -F "file=@mission.json" http://localhost:8001/api/files/upload
+curl http://localhost:8001/api/files
+curl http://localhost:8001/api/files/mission.json
+```
+
+Les fichiers échangés sont montés dans `shared/`. Les logs du bureau, noVNC, API et simulation sont montés dans `runtime/logs/`.
+
+### Installation locale AutoCarROS2
 
 Depuis la racine du workspace :
 
