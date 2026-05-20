@@ -32,7 +32,7 @@ class StartSimulationRequest(BaseModel):
         "default",
         description="default: pipeline autonome, click: goal via /goal_pose, gazebo: Gazebo seul pour commande manuelle",
     )
-    headless: bool = Field(True, description="Only used by mode=gazebo. true launches gzserver, false launches gazebo GUI.")
+    headless: bool = Field(False, description="Only used by mode=gazebo. false launches Gazebo GUI, true launches gzserver only.")
 
 
 class ManualCommandRequest(BaseModel):
@@ -174,7 +174,13 @@ def start_simulation(request: StartSimulationRequest) -> dict:
         )
 
     last_start_request = request
-    return {"started": True, "pid": simulation_process.pid, "mode": request.mode, "log_file": str(log_file)}
+    return {
+        "started": True,
+        "pid": simulation_process.pid,
+        "mode": request.mode,
+        "headless": request.headless if request.mode == "gazebo" else None,
+        "log_file": str(log_file),
+    }
 
 
 @app.post("/api/sim/stop")

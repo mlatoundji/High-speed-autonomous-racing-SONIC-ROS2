@@ -147,7 +147,15 @@ Modes disponibles :
 | --- | --- |
 | `default` | Lance `ros2 launch launches default_launch.py` avec la pile de navigation existante |
 | `click` | Lance `click_launch.py` et accepte des goals sur `/goal_pose` |
-| `gazebo` | Lance Gazebo seul, pratique pour les commandes manuelles sur `/autocar/cmd_vel` |
+| `gazebo` | Lance Gazebo GUI seul, pratique pour les commandes manuelles sur `/autocar/cmd_vel` |
+
+Pour lancer Gazebo sans interface graphique :
+
+```bash
+curl -X POST http://localhost:8001/api/sim/start \
+  -H "Content-Type: application/json" \
+  -d '{ "mode": "gazebo", "headless": true }'
+```
 
 Exemples API :
 
