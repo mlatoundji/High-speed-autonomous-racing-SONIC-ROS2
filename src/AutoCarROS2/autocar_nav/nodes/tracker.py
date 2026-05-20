@@ -5,6 +5,7 @@ import threading
 import numpy as np
 import rclpy
 from geometry_msgs.msg import PoseStamped, Twist
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from std_msgs.msg import Float64
 
@@ -29,15 +30,16 @@ class PathTracker(Node):
 
         # Load parameters
         try:
+            desc = ParameterDescriptor(dynamic_typing=True)
             self.declare_parameters(
                 namespace='',
                 parameters=[
-                    ('update_frequency', None),
-                    ('control_gain', None),
-                    ('softening_gain', None),
-                    ('yawrate_gain', None),
-                    ('steering_limits', None),
-                    ('centreofgravity_to_frontaxle', None)
+                    ('update_frequency', None, desc),
+                    ('control_gain', None, desc),
+                    ('softening_gain', None, desc),
+                    ('yawrate_gain', None, desc),
+                    ('steering_limits', None, desc),
+                    ('centreofgravity_to_frontaxle', None, desc)
                 ]
             )
 
