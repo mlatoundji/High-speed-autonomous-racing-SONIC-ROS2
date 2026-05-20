@@ -278,3 +278,15 @@ Si Gazebo charge le monde mais que l'interface graphique plante, tester le serve
 ```bash
 gazebo install/autocar_gazebo/share/autocar_gazebo/worlds/autocar.world
 ```
+
+## Baseline
+
+Premier temps au tour de référence avec le tracker Stanley existant : **3 min 11 s** (190.9 s sur ~650 m, vitesse moyenne 3.4 m/s, pic 5.85 m/s). Détails et reproductibilité dans [`docs/BASELINE.md`](docs/BASELINE.md).
+
+Pour reproduire :
+
+```bash
+ros2 launch launches race_launch.py
+```
+
+Chaque tour complété est appendé à `~/.ros/autocar_lap_times.csv` (CSV cumulatif, un `session_id` par lancement).
