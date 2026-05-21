@@ -37,7 +37,7 @@ Contrôleur haute vitesse
 Plugin Ackermann Gazebo
 ```
 
-Le sous-module `src/AutoCarROS2` fournit déjà les briques de base :
+Le dossier `src/AutoCarROS2` (code source intégré depuis [AutoCarROS2](https://github.com/winstxnhdw/AutoCarROS2)) fournit déjà les briques de base :
 
 | Package | Rôle |
 | --- | --- |
@@ -105,26 +105,14 @@ Le sous-module `src/AutoCarROS2` fournit déjà les briques de base :
 
 Sur WSL2, il faut aussi un affichage graphique fonctionnel pour Gazebo/RViz, par exemple WSLg sous Windows 11 ou un serveur X configuré.
 
-### Cloner le projet avec le sous-module
+### Cloner le projet
 
 ```bash
-git clone --recurse-submodules <url-du-depot> autocar
+git clone <url-du-depot> autocar
 cd autocar
 ```
 
-Si le dépôt a déjà été cloné sans sous-module :
-
-```bash
-git submodule update --init --recursive
-```
-
-Le sous-module est déclaré dans `.gitmodules` :
-
-```ini
-[submodule "src/AutoCarROS2"]
-	path = src/AutoCarROS2
-	url = https://github.com/winstxnhdw/AutoCarROS2.git
-```
+Le code AutoCarROS2 est versionné directement dans `src/AutoCarROS2` ; aucune initialisation de sous-module n'est nécessaire.
 
 ### Démarrage via conteneur ROS 2 Foxy
 
