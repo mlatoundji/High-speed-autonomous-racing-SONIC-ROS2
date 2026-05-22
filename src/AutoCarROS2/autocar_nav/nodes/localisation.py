@@ -3,6 +3,7 @@
 import numpy as np
 import rclpy
 from nav_msgs.msg import Odometry
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 from autocar_msgs.msg import State2D
@@ -22,10 +23,11 @@ class Localisation(Node):
 
         # Load parameters
         try:
+            desc = ParameterDescriptor(dynamic_typing=True)
             self.declare_parameters(
                 namespace='',
                 parameters=[
-                    ('update_frequency', None)
+                    ('update_frequency', None, desc)
                 ]
             )
 

@@ -7,6 +7,7 @@ import pandas as pd
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Pose, Pose2D, PoseArray
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 from autocar_msgs.msg import Path2D, State2D
@@ -29,14 +30,15 @@ class GlobalPathPlanner(Node):
 
         # Load parameters
         try:
+            desc = ParameterDescriptor(dynamic_typing=True)
             self.declare_parameters(
                 namespace='',
                 parameters=[
-                    ('waypoints_ahead', None),
-                    ('waypoints_behind', None),
-                    ('passed_threshold', None),
-                    ('waypoints', None),
-                    ('centreofgravity_to_frontaxle', None)
+                    ('waypoints_ahead', None, desc),
+                    ('waypoints_behind', None, desc),
+                    ('passed_threshold', None, desc),
+                    ('waypoints', None, desc),
+                    ('centreofgravity_to_frontaxle', None, desc)
                 ]
             )
 

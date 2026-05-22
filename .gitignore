@@ -9,3 +9,6 @@ src/*
 !src/AutoCarROS2
 !src/AutoCarROS2/**
 !src/commands.md
+
+# Claude Code runtime data
+.claude/scheduled_tasks.lock
