@@ -1,0 +1,50 @@
+# R1 -- Pure Pursuit vs Stanley comparison
+#
+# Runs the same number of laps for each controller, with three tuning
+# profiles per controller. Each row -> bench.py launches the sim once.
+#
+# Wall-clock estimate: 6 configs * (1 warmup + 5 measured) laps * ~3 min/lap
+#                    = ~3 hours. Cuts to ~1h once Pure Pursuit gets us below 100 s.
+#
+# NOTE: only meaningful once `controller:=pure_pursuit` actually swaps the
+# tracker node in race_launch.py (step 3 of the roadmap). Until then, both
+# rows below run Stanley and the comparison is degenerate.
+#
+# Usage:
+#   python3 scripts/bench.py --matrix scripts/matrices/r1_pp_vs_stanley.yaml
+
+- controller: stanley
+  profile: conservative
+  latency_ms: 0
+  odom_noise_std: 0.0
+  n_laps: 5
+
+- controller: stanley
+  profile: balanced
+  latency_ms: 0
+  odom_noise_std: 0.0
+  n_laps: 5
+
+- controller: stanley
+  profile: aggressive
+  latency_ms: 0
+  odom_noise_std: 0.0
+  n_laps: 5
+
+- controller: pure_pursuit
+  profile: conservative
+  latency_ms: 0
+  odom_noise_std: 0.0
+  n_laps: 5
+
+- controller: pure_pursuit
+  profile: balanced
+  latency_ms: 0
+  odom_noise_std: 0.0
+  n_laps: 5
+
+- controller: pure_pursuit
+  profile: aggressive
+  latency_ms: 0
+  odom_noise_std: 0.0
+  n_laps: 5

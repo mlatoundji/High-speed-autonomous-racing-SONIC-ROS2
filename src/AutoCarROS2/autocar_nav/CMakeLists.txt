@@ -40,6 +40,7 @@ install(PROGRAMS
   nodes/localplanner.py
   nodes/clickplanner.py
   nodes/tracker.py
+  nodes/pure_pursuit.py
   nodes/lap_timer.py
   DESTINATION lib/${PROJECT_NAME}
 )
