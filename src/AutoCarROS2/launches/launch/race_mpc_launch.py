@@ -10,7 +10,7 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess, SetEnvironment
 
 def generate_launch_description():
 
-    navpkg = 'autocar_nav_pure_pursuit'
+    navpkg = 'autocar_nav_mpc'
     gzpkg = 'autocar_gazebo'
     descpkg = 'autocar_description'
     mappkg = 'autocar_map'
@@ -93,7 +93,7 @@ def generate_launch_description():
             executable='lap_timer.py',
             parameters=[{
                 'use_sim_time': use_sim_time,
-                'stack': 'pure_pursuit',
+                'stack': 'mpc',
             }],
         ),
     ])

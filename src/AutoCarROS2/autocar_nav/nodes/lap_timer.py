@@ -13,8 +13,9 @@ Publishes:
 
 Persists every completed lap as a CSV row in
     ~/.ros/autocar_lap_times.csv
-The file is appended to across runs; each run is grouped by a single
-session_id (ISO timestamp of when the node started).
+
+After each lap, prints a comparison against docs/BASELINE.md (frozen CSV
+installed with this package under share/autocar_nav/baseline/).
 """
 
 import csv
@@ -24,26 +25,36 @@ from datetime import datetime
 from pathlib import Path
 
 import rclpy
+from ament_index_python.packages import get_package_share_directory
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from std_msgs.msg import Float64, Int32
 
 from autocar_msgs.msg import State2D
+from autocar_nav.baseline_compare import (
+    default_baseline_metrics,
+    format_lap_comparison,
+)
 
 
 CSV_PATH = Path(os.path.expanduser('~/.ros/autocar_lap_times.csv'))
 CSV_FIELDS = [
     'session_id', 'lap_number', 'timestamp_iso',
     'duration_s', 'avg_speed_mps', 'max_speed_mps', 'distance_m',
+    'stack',
 ]
-
 
 START_X = 103.67
 ROAD_HALF_WIDTH = 8.0
 
 MIN_LAP_TIME_S = 5.0
 
-# Rate at which the live timer is republished for HUD consumers.
 LIVE_TIMER_HZ = 10.0
+
+
+def _default_baseline_csv():
+    share = get_package_share_directory('autocar_nav')
+    return os.path.join(share, 'baseline', 'baseline_lap_times.csv')
 
 
 class LapTimer(Node):
@@ -51,9 +62,21 @@ class LapTimer(Node):
     def __init__(self):
         super().__init__('lap_timer')
 
-        self.sub = self.create_subscription(
-            State2D, '/autocar/state2D', self.state_cb, 10
+        desc = ParameterDescriptor(dynamic_typing=True)
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('baseline_csv', _default_baseline_csv(), desc),
+                ('stack', 'unknown', desc),
+            ],
         )
+
+        baseline_path = str(self.get_parameter('baseline_csv').value)
+        self.stack = str(self.get_parameter('stack').value)
+        self.baseline = default_baseline_metrics(baseline_path)
+
+        self.sub = self.create_subscription(
+            State2D, '/autocar/state2D', self.state_cb, 10)
         self.lap_pub = self.create_publisher(Float64, '/autocar/lap_time', 10)
         self.current_pub = self.create_publisher(Float64, '/autocar/current_lap_time', 10)
         self.count_pub = self.create_publisher(Int32, '/autocar/lap_count', 10)
@@ -64,23 +87,41 @@ class LapTimer(Node):
         self.lap_start_time = None
         self.dist_accum = 0.0
         self.max_speed = 0.0
-        self.best_lap = None  # seconds
+        self.best_lap = None
 
         self.timer = self.create_timer(1.0 / LIVE_TIMER_HZ, self._publish_live)
 
-        # CSV setup. Tag every row in this run with one session_id so we
-        # can group laps per launch when analysing the file later.
         self.session_id = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_csv_header()
+
+        self.get_logger().info(
+            f'Lap timer armed (stack={self.stack}). Start/finish: x={START_X:.2f}, '
+            f'y in [{-ROAD_HALF_WIDTH:+.1f}, {ROAD_HALF_WIDTH:+.1f}], +Y crossing. '
+            f'CSV: {CSV_PATH}  |  baseline: {baseline_path} '
+            f'({self.baseline["duration_s"]:.2f} s reference)'
+        )
+
+    def _ensure_csv_header(self):
+        self._legacy_csv = False
         if not CSV_PATH.exists():
             with CSV_PATH.open('w', newline='') as f:
                 csv.writer(f).writerow(CSV_FIELDS)
+            return
 
-        self.get_logger().info(
-            f'Lap timer armed. Start/finish line: x={START_X:.2f}, '
-            f'y in [{-ROAD_HALF_WIDTH:+.1f}, {ROAD_HALF_WIDTH:+.1f}], '
-            f'crossing direction: +Y. CSV log: {CSV_PATH}'
-        )
+        with CSV_PATH.open(newline='') as f:
+            header = next(csv.reader(f), None)
+
+        if header == CSV_FIELDS:
+            return
+        if header and len(header) == len(CSV_FIELDS) - 1 and 'stack' not in header:
+            self._legacy_csv = True
+            self.get_logger().warn(
+                'Lap CSV uses legacy 7-column format; appending without "stack" column.')
+            return
+
+        self.get_logger().warn(
+            f'Unexpected lap CSV header {header!r}; appending extended rows anyway.')
 
     def state_cb(self, msg: State2D):
         x = msg.pose.x
@@ -106,8 +147,6 @@ class LapTimer(Node):
         self.prev_x, self.prev_y = x, y
 
     def _publish_live(self):
-        # Always publish the lap count so the HUD shows 0 before the first
-        # crossing, then 1, 2, ...
         count = Int32()
         count.data = self.lap_count
         self.count_pub.publish(count)
@@ -140,26 +179,33 @@ class LapTimer(Node):
             best_tag = f'  (best {self.best_lap:.2f}s)'
 
         self.get_logger().info(
-            f'Lap {self.lap_count} completed: {elapsed:.2f} s '
+            f'Lap {self.lap_count} completed ({self.stack}): {elapsed:.2f} s '
             f'(avg {avg_speed:.2f} m/s, max {self.max_speed:.2f} m/s, '
             f'dist {self.dist_accum:.1f} m){best_tag}'
+        )
+        self.get_logger().info(
+            format_lap_comparison(
+                elapsed, avg_speed, self.max_speed, self.dist_accum, self.baseline)
         )
 
         msg = Float64()
         msg.data = elapsed
         self.lap_pub.publish(msg)
 
-        # Append to CSV.
+        row = [
+            self.session_id,
+            self.lap_count,
+            datetime.now().isoformat(timespec='seconds'),
+            f'{elapsed:.3f}',
+            f'{avg_speed:.3f}',
+            f'{self.max_speed:.3f}',
+            f'{self.dist_accum:.2f}',
+        ]
+        if not self._legacy_csv:
+            row.append(self.stack)
+
         with CSV_PATH.open('a', newline='') as f:
-            csv.writer(f).writerow([
-                self.session_id,
-                self.lap_count,
-                datetime.now().isoformat(timespec='seconds'),
-                f'{elapsed:.3f}',
-                f'{avg_speed:.3f}',
-                f'{self.max_speed:.3f}',
-                f'{self.dist_accum:.2f}',
-            ])
+            csv.writer(f).writerow(row)
 
         self.lap_start_time = now
         self.dist_accum = 0.0

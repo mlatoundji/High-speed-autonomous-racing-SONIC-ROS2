@@ -75,7 +75,12 @@ def generate_launch_description():
         Node(package=navpkg, name='local_planner',  executable='localplanner.py',  parameters=[navconfig, {'use_sim_time': use_sim_time}]),
         Node(package=mappkg, name='bof',            executable='bof',              parameters=[{'use_sim_time': use_sim_time}]),
         Node(package=navpkg, name='path_tracker',   executable='tracker.py',       parameters=[navconfig, {'use_sim_time': use_sim_time}]),
-        Node(package=navpkg, name='lap_timer',      executable='lap_timer.py',     parameters=[{'use_sim_time': use_sim_time}]),
+        Node(
+            package=navpkg,
+            name='lap_timer',
+            executable='lap_timer.py',
+            parameters=[{'use_sim_time': use_sim_time, 'stack': 'stanley'}],
+        ),
     ])
 
 

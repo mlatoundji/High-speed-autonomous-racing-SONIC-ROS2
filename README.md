@@ -289,4 +289,9 @@ Pour reproduire :
 ros2 launch launches race_launch.py
 ```
 
-Chaque tour complété est appendé à `~/.ros/autocar_lap_times.csv` (CSV cumulatif, un `session_id` par lancement).
+Chaque tour complété est appendé à `~/.ros/autocar_lap_times.csv` (CSV cumulatif, un `session_id` par lancement). Le nœud `lap_timer` affiche après chaque tour une comparaison avec [`docs/BASELINE.md`](docs/BASELINE.md). Pour analyser hors simulation :
+
+```bash
+python3 scripts/compare_lap_times.py
+python3 scripts/compare_lap_times.py --session all --detail
+```
