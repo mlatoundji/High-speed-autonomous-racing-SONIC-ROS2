@@ -20,17 +20,8 @@ global_planner:
 path_tracker:
     ros__parameters:
         update_frequency: 50.0
-        # Stanley params (read only by tracker.py).
         control_gain: 1.0
         softening_gain: 1.0
         yawrate_gain: 1.0
-        # Pure Pursuit params (read only by pure_pursuit.py).
-        # Default values: at v=6 m/s the lookahead is 3.9 m, which is the
-        # setting that produced the first clean PP lap at 195.3 s.
-        lookahead_min_m: 1.5
-        lookahead_gain: 0.4
-        wheelbase_m: 2.966
-        centreofgravity_to_rearaxle: 1.483
-        # Shared with both controllers.
         steering_limits: 0.95
         centreofgravity_to_frontaxle: 1.483

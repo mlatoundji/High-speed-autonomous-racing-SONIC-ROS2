@@ -1,2 +1,0 @@
-controller,profile,latency_ms,odom_noise_std,session_id,n_laps_recorded,n_measured,timed_out,median_lap_s,std_lap_s,min_lap_s,max_lap_s,median_lat_rms,max_lat_max,sum_offtrack
-stanley,default,0,0.0,2026-05-23T17-51-22,1,0,False,,,,,,,

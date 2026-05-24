@@ -1,12 +1,12 @@
 # High-Speed Autonomous Racing - SONIC ROS 2
 
-Projet D : développement d'un robot de course autonome capable de terminer des tours de piste le plus rapidement possible sans collision avec les limites du circuit. Le projet s'appuie sur [AutoCarROS2](https://github.com/winstxnhdw/AutoCarROS2), un environnement ROS 2 + Gazebo pour véhicule non holonome avec modèle Ackermann. Le code tourne sur **ROS 2 Humble** (l'upstream AutoCarROS2 visait Foxy ; le portage Humble est transparent côté APIs utilisées).
+Projet D : développement d'un robot de course autonome capable de terminer des tours de piste le plus rapidement possible sans collision avec les limites du circuit. Le projet s'appuie sur [AutoCarROS2](https://github.com/winstxnhdw/AutoCarROS2), un environnement ROS 2 Foxy + Gazebo pour véhicule non holonome avec modèle Ackermann.
 
 L'objectif est de dépasser une navigation conservatrice classique en ajoutant une logique de course : génération d'une racing line, contrôle latéral/longitudinal agressif, mesure des temps au tour et analyse de la robustesse face à la latence et au bruit d'odométrie.
 
 ## Objectifs
 
-- Simuler un véhicule Ackermann sur circuit avec ROS 2 Humble et Gazebo 11.
+- Simuler un véhicule Ackermann sur circuit avec ROS 2 Foxy et Gazebo 11.
 - Implémenter un contrôleur haute vitesse, sous forme de plugin Nav2 ou de noeud ROS 2 autonome.
 - Comparer plusieurs réglages de conduite : conservateur, équilibré et agressif.
 - Calculer et suivre une racing line plutôt qu'une simple ligne centrale.
@@ -98,9 +98,9 @@ Le dossier `src/AutoCarROS2` (code source intégré depuis [AutoCarROS2](https:/
 
 ### Prérequis
 
-- Ubuntu 22.04 (WSL2 ou natif) pour ROS 2 Humble.
-- ROS 2 Humble Hawksbill (installé dans `/opt/ros/humble`).
-- Gazebo 11 (Gazebo Classic).
+- Ubuntu 20.04 recommandé pour ROS 2 Foxy.
+- ROS 2 Foxy Fitzroy.
+- Gazebo 11.
 - `git`, `python3-pip`, `colcon`, `rosdep`.
 
 Sur WSL2, il faut aussi un affichage graphique fonctionnel pour Gazebo/RViz, par exemple WSLg sous Windows 11 ou un serveur X configuré.
@@ -114,9 +114,7 @@ cd autocar
 
 Le code AutoCarROS2 est versionné directement dans `src/AutoCarROS2` ; aucune initialisation de sous-module n'est nécessaire.
 
-### Démarrage via conteneur ROS 2 Foxy (optionnel, legacy)
-
-> Note : le développement principal se fait en local sur ROS 2 Humble. Le conteneur Foxy ci-dessous a été utile pour valider le portage initial d'AutoCarROS2 mais n'est plus le chemin recommandé pour les expériences de racing.
+### Démarrage via conteneur ROS 2 Foxy
 
 Le dépôt fournit un conteneur ROS 2 Foxy Fitzroy + Gazebo 11 qui expose :
 
@@ -186,9 +184,7 @@ cd src/AutoCarROS2
 sh ros-foxy-desktop-full-install.sh
 ```
 
-> Le script porte "foxy" dans son nom pour des raisons historiques (upstream AutoCarROS2). Sur une machine Humble, suis plutôt la procédure officielle ROS 2 Humble (`apt install ros-humble-desktop-full`) puis le script `requirements.sh` ci-dessous.
-
-Si ROS 2 (Foxy ou Humble) est déjà installé, installer uniquement les dépendances du projet :
+Si ROS 2 Foxy est déjà installé, installer uniquement les dépendances du projet :
 
 ```bash
 cd src/AutoCarROS2
@@ -204,7 +200,7 @@ cd ../..
 ### Compiler
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/foxy/setup.bash
 colcon build
 source install/setup.bash
 ```
@@ -265,7 +261,7 @@ Métriques à produire :
 Si `ros2 launch` ne trouve pas les packages, recharger l'environnement :
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/foxy/setup.bash
 source install/setup.bash
 ```
 
