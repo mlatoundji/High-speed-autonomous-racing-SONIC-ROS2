@@ -40,6 +40,6 @@ in the few long straights.
 
 ## Raw data
 
-See [`baseline_lap_times.csv`](baseline_lap_times.csv). The active CSV log
-lives at `~/.ros/autocar_lap_times.csv` and accumulates every future run;
-this file is a frozen copy of the baseline for reproducibility.
+See [`lap_times/lap_times_baseline.csv`](lap_times/lap_times_baseline.csv) (frozen Stanley lap 1).
+
+Live Stanley runs append to [`lap_times/lap_times_stanley.csv`](lap_times/lap_times_stanley.csv). Other stacks use `lap_times_mpc.csv`, `lap_times_pure_pursuit.csv` under the same directory. Layout: [`lap_times/README.md`](lap_times/README.md).

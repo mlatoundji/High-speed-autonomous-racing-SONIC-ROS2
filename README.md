@@ -281,7 +281,7 @@ gazebo install/autocar_gazebo/share/autocar_gazebo/worlds/autocar.world
 
 ## Baseline
 
-Premier temps au tour de référence avec le tracker Stanley existant : **3 min 11 s** (190.9 s sur ~650 m, vitesse moyenne 3.4 m/s, pic 5.85 m/s). Détails et reproductibilité dans [`docs/BASELINE.md`](docs/BASELINE.md).
+Premier temps au tour de référence avec le tracker Stanley existant : **3 min 11 s** (190.9 s sur ~650 m, vitesse moyenne 3.4 m/s, pic 5.85 m/s). Détails et reproductibilité dans [`docs/REPORT_BASELINE.md`](docs/REPORT_BASELINE.md).
 
 Pour reproduire :
 
@@ -289,9 +289,4 @@ Pour reproduire :
 ros2 launch launches race_launch.py
 ```
 
-Chaque tour complété est appendé à `~/.ros/autocar_lap_times.csv` (CSV cumulatif, un `session_id` par lancement). Le nœud `lap_timer` affiche après chaque tour une comparaison avec [`docs/BASELINE.md`](docs/BASELINE.md). Pour analyser hors simulation :
-
-```bash
-python3 scripts/compare_lap_times.py
-python3 scripts/compare_lap_times.py --session all --detail
-```
+Chaque tour complété est enregistré sous **`docs/lap_times/lap_times_<stack>.csv`** (voir [`docs/README.md`](docs/README.md)). Comparaison manuelle via les `REPORT_*.md` ou les CSV.

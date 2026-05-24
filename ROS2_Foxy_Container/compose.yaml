@@ -9,10 +9,12 @@ services:
       API_PORT: "8001"
       VNC_RESOLUTION: "1280x800"
       LIBGL_ALWAYS_SOFTWARE: "1"
+      AUTOCAR_REPO_ROOT: "/workspace/autocar"
     ports:
       - "6080:6080"
       - "8001:8001"
     volumes:
+      - ..:/workspace/autocar:rw
       - ./shared:/workspace/shared
       - ./runtime:/workspace/runtime
     shm_size: "1gb"

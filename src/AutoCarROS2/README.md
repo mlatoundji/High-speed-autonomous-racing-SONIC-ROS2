@@ -89,8 +89,6 @@ $ ros2 launch launches race_pure_pursuit_launch.py
 $ colcon build --packages-select autocar_nav autocar_nav_mpc launches --symlink-install
 $ source install/setup.bash
 $ ros2 launch launches race_mpc_launch.py
-# After a lap: compare vs baseline
-$ python3 scripts/compare_lap_times.py --detail
 ```
 
 ## Launch Files
@@ -113,7 +111,7 @@ $ python3 scripts/compare_lap_times.py --detail
 |`autocar_msgs`|Contains all custom messages used throughout every package|
 |`autocar_nav`|Contains the navigation stack (Stanley tracker)|
 |`autocar_nav_pure_pursuit`|Pure Pursuit navigation stack (faster, curvature-aware speed)|
-|`autocar_nav_mpc`|Model Predictive Control navigation stack (see [`docs/MPC_REPORT.md`](../../docs/MPC_REPORT.md))|
+|`autocar_nav_mpc`|Model Predictive Control navigation stack (see [`docs/REPORT_MPC.md`](../../docs/REPORT_MPC.md))|
 
 ## Troubleshoot
 

@@ -1,7 +1,7 @@
 # MPC Report — `autocar_nav_mpc` vs Stanley baseline
 
-Frozen lap log: [`mpc_lap_times.csv`](mpc_lap_times.csv) (**lap 1 only** for baseline comparison).  
-Reference baseline: [`BASELINE.md`](BASELINE.md) / [`baseline_lap_times.csv`](baseline_lap_times.csv) (Stanley lap 1).
+Frozen lap log: [`lap_times/lap_times_mpc.csv`](lap_times/lap_times_mpc.csv) (**lap 1 only** for baseline comparison).
+Reference baseline: [`REPORT_BASELINE.md`](REPORT_BASELINE.md) / [`lap_times/lap_times_baseline.csv`](lap_times/lap_times_baseline.csv) (Stanley lap 1). Layout: [`lap_times/README.md`](lap_times/README.md).
 
 ## Setup
 
@@ -49,7 +49,7 @@ Lap time (s) — lap 1 vs baseline
  90 |██████████████                            Racing target 90 s
 ```
 
-## Roadmap targets ([`BASELINE.md`](BASELINE.md))
+## Roadmap targets ([`REPORT_BASELINE.md`](REPORT_BASELINE.md))
 
 Evaluated against MPC lap 1 vs Stanley lap 1.
 
@@ -87,7 +87,6 @@ If lap 2 were used instead (not the report convention): 113.20 s would still bea
 colcon build --packages-select autocar_nav autocar_nav_mpc launches --symlink-install
 source install/setup.bash
 ros2 launch launches race_mpc_launch.py
-python3 scripts/compare_lap_times.py --csv docs/mpc_lap_times.csv --detail
 ```
 
-To refresh this report, update [`mpc_lap_times.csv`](mpc_lap_times.csv) and revise the tables above (baseline comparison uses **lap 1** only).
+To refresh this report, update [`lap_times/lap_times_mpc.csv`](lap_times/lap_times_mpc.csv) and revise the tables above (baseline comparison uses **lap 1** only).

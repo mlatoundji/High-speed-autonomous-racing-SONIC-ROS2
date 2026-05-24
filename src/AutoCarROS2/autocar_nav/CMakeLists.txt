@@ -35,7 +35,7 @@ install(DIRECTORY
 )
 
 install(
-  FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../../docs/baseline_lap_times.csv
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../../docs/lap_times/lap_times_baseline.csv
   DESTINATION share/${PROJECT_NAME}/baseline
 )
 
