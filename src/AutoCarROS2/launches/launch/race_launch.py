@@ -111,7 +111,22 @@ def generate_launch_description():
             output={'both': 'log'}
         ),
 
-        Node(package=navpkg, name='localisation',   executable='localisation.py',  parameters=[navconfig, {'use_sim_time': use_sim_time}]),
+        # Localisation publishes state on /autocar/state2D_raw; the
+        # latency_injector below republishes to /autocar/state2D after a
+        # configurable delay (pass-through when latency_ms=0). All
+        # consumers stay subscribed to /autocar/state2D unchanged.
+        Node(
+            package=navpkg, name='localisation', executable='localisation.py',
+            parameters=[navconfig, {'use_sim_time': use_sim_time}],
+            remappings=[('/autocar/state2D', '/autocar/state2D_raw')],
+        ),
+        Node(
+            package=navpkg, name='latency_injector', executable='latency_injector.py',
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'latency_ms': ParameterValue(latency_ms, value_type=int),
+            }],
+        ),
         # Global planner: same node twice, the launch arg `line` picks
         # which waypoints CSV gets loaded. Only one fires per launch.
         Node(

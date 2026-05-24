@@ -42,6 +42,7 @@ install(PROGRAMS
   nodes/tracker.py
   nodes/pure_pursuit.py
   nodes/lap_timer.py
+  nodes/latency_injector.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

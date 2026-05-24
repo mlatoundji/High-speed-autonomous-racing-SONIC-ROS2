@@ -80,6 +80,7 @@ def normalize_config(cfg: dict, default_n_warmup: int) -> dict:
     return {
         'controller': str(cfg.get('controller', 'stanley')),
         'profile': str(cfg.get('profile', 'default')),
+        'line': str(cfg.get('line', 'centerline')),
         'latency_ms': int(cfg.get('latency_ms', 0)),
         'odom_noise_std': float(cfg.get('odom_noise_std', 0.0)),
         'n_laps': n_laps,
@@ -107,6 +108,7 @@ def launch_command(cfg: dict) -> str:
         'ros2 launch launches race_launch.py '
         f'controller:={cfg["controller"]} '
         f'profile:={cfg["profile"]} '
+        f'line:={cfg["line"]} '
         f'latency_ms:={cfg["latency_ms"]} '
         f'odom_noise_std:={cfg["odom_noise_std"]}'
     )
