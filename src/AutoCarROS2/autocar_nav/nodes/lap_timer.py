@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lap timer for the race circuit.
 
-Detects start/finish crossings and appends rows to docs/lap_times/lap_times_<stack>.csv.
+Detects start/finish crossings and appends rows to results/lap_times_<stack>.csv.
 
 Publishes:
     /autocar/lap_time          (Float64)  -- last completed lap, in s
@@ -51,7 +51,7 @@ class LapTimer(Node):
         csv_override = str(self.get_parameter('lap_times_csv').value).strip()
 
         override = csv_override or None
-        self._csv_targets, self._in_project_docs = lap_log_paths(self.stack, override)
+        self._csv_targets, self._in_project_repo = lap_log_paths(self.stack, override)
 
         if not self._csv_targets:
             raise RuntimeError(
@@ -63,9 +63,9 @@ class LapTimer(Node):
             path.parent.mkdir(parents=True, exist_ok=True)
             self._ensure_csv_header(path)
 
-        if not self._in_project_docs:
+        if not self._in_project_repo:
             self.get_logger().warn(
-                'Could not locate repo docs/lap_times/. '
+                'Could not locate repo results/. '
                 'Lap CSV: %s. Set AUTOCAR_REPO_ROOT to your repo root.' % (
                     self._csv_targets[0],
                 ),

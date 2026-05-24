@@ -289,4 +289,4 @@ Pour reproduire :
 ros2 launch launches race_launch.py
 ```
 
-Chaque tour complété est enregistré sous **`docs/lap_times/lap_times_<stack>.csv`** (voir [`docs/README.md`](docs/README.md)). Comparaison manuelle via les `REPORT_*.md` ou les CSV.
+Chaque tour complété est enregistré sous **`results/lap_times_<stack>.csv`** (voir [`results/README.md`](results/README.md)). Comparaison manuelle via les `REPORT_*.md` ou les CSV.
