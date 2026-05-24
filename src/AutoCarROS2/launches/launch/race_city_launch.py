@@ -1,5 +1,11 @@
 import os
 import subprocess
+import sys
+
+_LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
+if _LAUNCH_DIR not in sys.path:
+    sys.path.insert(0, _LAUNCH_DIR)
+from repo_results import lap_timer_parameters  # noqa: E402
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -66,7 +72,12 @@ def generate_launch_description():
         Node(package=navpkg, name='local_planner',  executable='localplanner.py',  parameters=[navconfig]),
         Node(package=mappkg, name='bof',            executable='bof'),
         Node(package=navpkg, name='path_tracker',   executable='tracker.py',       parameters=[navconfig]),
-        Node(package=navpkg, name='lap_timer',      executable='lap_timer.py'),
+        Node(
+            package='autocar_nav',
+            name='lap_timer',
+            executable='lap_timer.py',
+            parameters=[lap_timer_parameters('stanley', LaunchConfiguration('use_sim_time', default='True'))],
+        ),
     ])
 
 

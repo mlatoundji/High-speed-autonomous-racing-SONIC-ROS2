@@ -79,6 +79,16 @@ $ ros2 launch launches default_launch.py
 
 # Launch the interactive launch file
 $ ros2 launch launches click_launch.py
+
+# Pure Pursuit race stack (build autocar_nav_pure_pursuit first)
+$ colcon build --packages-select autocar_nav autocar_nav_pure_pursuit launches --symlink-install
+$ source install/setup.bash
+$ ros2 launch launches race_pure_pursuit_launch.py
+
+# MPC race stack (lap_timer is in autocar_nav)
+$ colcon build --packages-select autocar_nav autocar_nav_mpc launches --symlink-install
+$ source install/setup.bash
+$ ros2 launch launches race_mpc_launch.py
 ```
 
 ## Launch Files
@@ -87,6 +97,8 @@ $ ros2 launch launches click_launch.py
 |-----------|-------|
 |`default_launch.py`|Complete pipeline with preset waypoints|
 |`click_launch.py`|Interactive pipeline for testing and fun|
+|`race_pure_pursuit_launch.py`|Race circuit with Pure Pursuit tracker (higher speed)|
+|`race_mpc_launch.py`|Race circuit with Model Predictive Control tracker|
 
 ## Packages
 
@@ -97,7 +109,9 @@ $ ros2 launch launches click_launch.py
 |`autocar_gazebo`|Contains the world files and model's SDF|
 |`autocar_map`|Contains the Bayesian Occupancy Filter stack|
 |`autocar_msgs`|Contains all custom messages used throughout every package|
-|`autocar_nav`|Contains the navigation stack|
+|`autocar_nav`|Contains the navigation stack (Stanley tracker)|
+|`autocar_nav_pure_pursuit`|Pure Pursuit navigation stack (faster, curvature-aware speed)|
+|`autocar_nav_mpc`|Model Predictive Control navigation stack (see [`docs/REPORT_MPC.md`](../../docs/REPORT_MPC.md))|
 
 ## Troubleshoot
 
