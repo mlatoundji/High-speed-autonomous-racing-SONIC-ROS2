@@ -1,0 +1,17 @@
+# Smoke test matrix for bench.py
+#
+# Runs ONE Stanley lap end-to-end. Used to verify that the harness can:
+#   - kill any leftover Gazebo
+#   - launch race_launch.py with parameters
+#   - detect lap completion via the CSV
+#   - aggregate results into docs/snapshots/
+#
+# Usage:
+#   python3 scripts/bench.py --matrix scripts/matrices/quick.yaml
+
+- controller: stanley
+  profile: default
+  latency_ms: 0
+  odom_noise_std: 0.0
+  n_laps: 1
+  n_warmup: 0    # smoke test: keep the single recorded lap, don't discard it

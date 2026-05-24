@@ -18,10 +18,14 @@ def repo_docs_dir():
         os.path.dirname(__file__), '..', '..', '..', '..', 'docs'))
 
 
-def lap_timer_parameters(stack, use_sim_time):
+def lap_timer_parameters(stack, use_sim_time, profile='default', latency_ms=0, odom_noise_std=0.0):
     docs = repo_docs_dir()
     return {
         'use_sim_time': use_sim_time,
         'stack': stack,
         'lap_times_csv': os.path.join(docs, _LAP_TIMES_DIR, f'lap_times_{stack}.csv'),
+        'controller': stack,
+        'profile': profile,
+        'latency_ms': latency_ms,
+        'odom_noise_std': odom_noise_std,
     }

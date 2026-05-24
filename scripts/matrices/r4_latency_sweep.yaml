@@ -1,0 +1,44 @@
+# R4 - Latency sweep
+#
+# Stanley + racing line, with 4 different artificial-latency values.
+# Each config: 1 warmup lap + 1 measured lap.
+# Total wall clock: ~24-30 minutes (4 configs * ~6 min/config).
+#
+# We already have latency_ms=0 and latency_ms=100 measured (R3, R4).
+# This sweep extends to 200/300/500/1000 ms to find the breaking point
+# of the controller-with-delay system.
+#
+# Usage:
+#   python3 scripts/bench.py --matrix scripts/matrices/r4_latency_sweep.yaml
+
+- controller: stanley
+  profile: default
+  line: racing
+  latency_ms: 200
+  odom_noise_std: 0.0
+  n_laps: 2
+  n_warmup: 1
+
+- controller: stanley
+  profile: default
+  line: racing
+  latency_ms: 300
+  odom_noise_std: 0.0
+  n_laps: 2
+  n_warmup: 1
+
+- controller: stanley
+  profile: default
+  line: racing
+  latency_ms: 500
+  odom_noise_std: 0.0
+  n_laps: 2
+  n_warmup: 1
+
+- controller: stanley
+  profile: default
+  line: racing
+  latency_ms: 1000
+  odom_noise_std: 0.0
+  n_laps: 2
+  n_warmup: 1

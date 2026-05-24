@@ -24,7 +24,7 @@ REPORT_BASELINE_NAME = 'REPORT_BASELINE.md'
 
 KNOWN_STACKS = frozenset({'stanley', 'mpc', 'pure_pursuit'})
 
-LAP_TIMES_CSV_FIELDS = (
+LAP_TIMES_LEGACY_FIELDS = (
     'session_id',
     'lap_number',
     'timestamp_iso',
@@ -33,6 +33,19 @@ LAP_TIMES_CSV_FIELDS = (
     'max_speed_mps',
     'distance_m',
 )
+
+LAP_TIMES_EXTRA_FIELDS = (
+    'controller',
+    'profile',
+    'latency_ms',
+    'odom_noise_std',
+    'lateral_error_rms',
+    'lateral_error_max',
+    'steering_rate_max',
+    'offtrack_events',
+)
+
+LAP_TIMES_CSV_FIELDS = LAP_TIMES_LEGACY_FIELDS + LAP_TIMES_EXTRA_FIELDS
 
 
 def stack_lap_times_name(stack):
