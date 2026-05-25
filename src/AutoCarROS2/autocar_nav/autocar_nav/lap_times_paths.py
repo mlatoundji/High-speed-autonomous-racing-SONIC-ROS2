@@ -42,8 +42,10 @@ def make_run_id(when=None):
     return dt.strftime('%Y-%m-%dT%H-%M-%S')
 
 
-def run_directory_name(stack, run_id):
-    """Directory name: ``<stack>_<run_id>``."""
+def run_directory_name(stack, run_id, line=None):
+    """Directory name: ``<stack>_<line>_<run_id>`` when line is not centerline."""
+    if line and line not in ('centerline', 'center'):
+        return f'{stack}_{line}_{run_id}'
     return f'{stack}_{run_id}'
 
 
@@ -55,11 +57,11 @@ def baseline_csv_in_repo(root: Path) -> Path:
     return results_dir(root) / BASELINE_NAME
 
 
-def run_dir_path(stack, run_id=None, results_root=None):
-    """Absolute path to ``results/<stack>_<run_id>/``."""
+def run_dir_path(stack, run_id=None, results_root=None, line=None):
+    """Absolute path to ``results/<stack>_<run_id>/`` (or with line suffix)."""
     base = Path(results_root) if results_root else resolve_lap_times_dir()
     rid = run_id or make_run_id()
-    return base / run_directory_name(stack, rid), rid
+    return base / run_directory_name(stack, rid, line=line), rid
 
 
 def run_lap_times_csv(run_dir: Path) -> Path:
@@ -151,7 +153,7 @@ def _dump_yaml(path, data):
         yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
 
-def write_run_params(run_dir, stack, run_id, navconfig_path=None, use_sim_time=None):
+def write_run_params(run_dir, stack, run_id, navconfig_path=None, use_sim_time=None, line=None):
     """Write ``params.yml`` for a new run directory."""
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -167,6 +169,8 @@ def write_run_params(run_dir, stack, run_id, navconfig_path=None, use_sim_time=N
     if use_sim_time is not None:
         payload['run']['use_sim_time'] = bool(use_sim_time) if isinstance(
             use_sim_time, bool) else str(use_sim_time)
+    if line is not None:
+        payload['run']['line'] = str(line)
 
     nav_path = None
     if navconfig_path:
@@ -208,7 +212,7 @@ def init_lap_times_csv(csv_path):
         csv.writer(f).writerow(LAP_TIMES_CSV_FIELDS)
 
 
-def prepare_run_directory(stack, navconfig_path=None, use_sim_time=None, run_id=None):
+def prepare_run_directory(stack, navconfig_path=None, use_sim_time=None, run_id=None, line=None):
     """Create ``results/<stack>_<run_id>/`` with ``params.yml`` and ``lap_times.csv``.
 
     Returns:
@@ -218,8 +222,8 @@ def prepare_run_directory(stack, navconfig_path=None, use_sim_time=None, run_id=
         raise ValueError(
             f'Unknown stack {stack!r}; expected one of: {sorted(KNOWN_STACKS)}')
 
-    run_dir, rid = run_dir_path(stack, run_id=run_id)
-    write_run_params(run_dir, stack, rid, navconfig_path, use_sim_time=use_sim_time)
+    run_dir, rid = run_dir_path(stack, run_id=run_id, line=line)
+    write_run_params(run_dir, stack, rid, navconfig_path, use_sim_time=use_sim_time, line=line)
     init_lap_times_csv(run_lap_times_csv(run_dir))
     return run_dir, rid
 
