@@ -24,7 +24,7 @@ def _use_sim_time_for_params(use_sim_time):
     return None
 
 
-def lap_timer_parameters(stack, use_sim_time, navconfig_path=None, run_id=None):
+def lap_timer_parameters(stack, use_sim_time, navconfig_path=None, run_id=None, line=None):
     """Create ``results/<stack>_<run_id>/`` and return lap_timer ROS parameters."""
     from autocar_nav.lap_times_paths import prepare_run_directory
 
@@ -33,6 +33,7 @@ def lap_timer_parameters(stack, use_sim_time, navconfig_path=None, run_id=None):
         navconfig_path=navconfig_path,
         use_sim_time=_use_sim_time_for_params(use_sim_time),
         run_id=run_id,
+        line=line,
     )
 
     lap_times_csv = run_dir / 'lap_times.csv'

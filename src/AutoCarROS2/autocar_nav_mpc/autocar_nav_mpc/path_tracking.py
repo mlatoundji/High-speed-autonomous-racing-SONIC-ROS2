@@ -28,7 +28,7 @@ def path_tangent_heading(path_theta):
     return float(path_theta)
 
 
-def closest_path_index(fx, fy, cx, cy, start_idx=0, search_ahead=80):
+def closest_path_index(fx, fy, cx, cy, start_idx=0, search_ahead=80, min_advance=0):
     """Forward-only closest-point search for path tracking stability."""
     n = len(cx)
     if n == 0:
@@ -37,16 +37,19 @@ def closest_path_index(fx, fy, cx, cy, start_idx=0, search_ahead=80):
     start_idx = int(np.clip(start_idx, 0, n - 1))
     end_idx = min(n, start_idx + search_ahead + 1)
 
-    best_idx = start_idx
-    best_d2 = (cx[start_idx] - fx) ** 2 + (cy[start_idx] - fy) ** 2
+    xs = np.asarray(cx[start_idx:end_idx], dtype=float)
+    ys = np.asarray(cy[start_idx:end_idx], dtype=float)
+    d2 = (xs - fx) ** 2 + (ys - fy) ** 2
+    local_best = int(np.argmin(d2))
+    best_idx = start_idx + local_best
 
-    for idx in range(start_idx + 1, end_idx):
-        d2 = (cx[idx] - fx) ** 2 + (cy[idx] - fy) ** 2
-        if d2 <= best_d2:
-            best_d2 = d2
-            best_idx = idx
-        else:
-            break
+    if min_advance > 0 and best_idx < n - 1:
+        seg = np.hypot(
+            cx[min(best_idx + 1, n - 1)] - cx[best_idx],
+            cy[min(best_idx + 1, n - 1)] - cy[best_idx],
+        )
+        if seg > 1e-6 and np.sqrt(d2[local_best]) < min_advance * seg:
+            best_idx = min(best_idx + 1, n - 1)
 
     return best_idx
 
@@ -123,6 +126,16 @@ def curvature_horizon_from_path(cx, cy, start_idx, horizon):
     ]
 
 
+def preview_curvature(kappa_seq, decay=0.12):
+    """Weighted preview curvature for feedforward steering."""
+    if not kappa_seq:
+        return 0.0
+    n = len(kappa_seq)
+    weights = np.exp(-decay * np.arange(n))
+    weights /= weights.sum()
+    return float(np.dot(weights, kappa_seq))
+
+
 def peak_curvature(ck, start_idx, end_idx, smooth_window=5):
     """Peak |kappa| with moving-average filter."""
     segment = [abs(k) for k in ck[start_idx:end_idx]]
@@ -168,3 +181,24 @@ def speed_scale_from_errors(e_y, e_psi, lateral_soft=4.0, heading_soft=0.6):
     lat = float(np.exp(-abs(e_y) / max(lateral_soft, 0.5)))
     head = float(np.exp(-abs(e_psi) / max(heading_soft, 0.1)))
     return lat * head
+
+
+def smooth_steering(steer, prev_steer, alpha):
+    """Exponential smoothing on steer angle (0 = off, 0.3 typical)."""
+    if prev_steer is None or alpha <= 0.0:
+        return steer
+    return float((1.0 - alpha) * steer + alpha * prev_steer)
+
+
+def path_index_on_update(fx, fy, cx, cy, old_cx, old_cy, old_idx, search_ahead, jump_thresh=4.0):
+    """Re-anchor closest index when the path window shifts."""
+    if not cx:
+        return 0
+    idx = closest_path_index(fx, fy, cx, cy, start_idx=0, search_ahead=search_ahead)
+    if not old_cx or old_idx >= len(old_cx):
+        return idx
+    jump = np.hypot(cx[idx] - old_cx[old_idx], cy[idx] - old_cy[old_idx])
+    if jump < jump_thresh:
+        return closest_path_index(
+            fx, fy, cx, cy, start_idx=max(0, old_idx - 5), search_ahead=search_ahead)
+    return idx

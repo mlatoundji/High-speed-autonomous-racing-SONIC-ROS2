@@ -20,7 +20,8 @@ from autocar_nav_mpc.path_tracking import (
 )
 
 LATERAL_OFFSETS = [0.0, 1.5, -1.5, 3.0, -3.0, 4.5, -4.5, 6.0, -6.0]
-OCCUPANCY_THRESHOLD = 50
+# bof grid prior is 50 (unknown); only count clearly occupied cells
+OCCUPANCY_OCCUPIED_MIN = 60
 
 
 class LocalPathPlanner(Node):
@@ -62,6 +63,9 @@ class LocalPathPlanner(Node):
                     ('curvature_smooth_window', None, desc),
                     ('accel_rate', None, desc),
                     ('decel_rate', None, desc),
+                    ('path_resolution', None, desc),
+                    ('obstacle_check_horizon', None, desc),
+                    ('obstacle_blocked_fraction', None, desc),
                 ],
             )
 
@@ -71,6 +75,9 @@ class LocalPathPlanner(Node):
             self.cg2frontaxle = float(self.get_parameter('centreofgravity_to_frontaxle').value)
             self.cruise_vel = float(self.get_parameter('cruise_velocity').value)
             self.avoid_vel = float(self.get_parameter('avoid_velocity').value)
+            self.path_ds = float(self.get_parameter('path_resolution').value)
+            self.obs_horizon = float(self.get_parameter('obstacle_check_horizon').value)
+            self.obs_blocked_frac = float(self.get_parameter('obstacle_blocked_fraction').value)
             self.max_lat_accel = float(self.get_parameter('max_lateral_accel').value)
             self.min_kappa = float(self.get_parameter('min_curvature').value)
             self.curv_lookahead = int(self.get_parameter('curvature_lookahead').value)
@@ -81,7 +88,7 @@ class LocalPathPlanner(Node):
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
 
-        self.ds = 1.0 / self.frequency
+        self.timer_ds = 1.0 / self.frequency
 
         self.target_vel = self.cruise_vel
         self.ramped_vel = self.cruise_vel
@@ -100,7 +107,7 @@ class LocalPathPlanner(Node):
         self.y = 0.0
         self.yaw = 0.0
 
-        self.timer = self.create_timer(self.ds, self.timer_cb)
+        self.timer = self.create_timer(self.timer_ds, self.timer_cb)
 
     def timer_cb(self):
         self._update_target_velocity()
@@ -128,7 +135,7 @@ class LocalPathPlanner(Node):
         v_target = min(self.target_vel, v_curve)
 
         self.ramped_vel = apply_speed_ramp(
-            self.ramped_vel, v_target, self.ds,
+            self.ramped_vel, v_target, self.timer_ds,
             self.accel_rate, self.decel_rate)
 
     def map_cb(self, msg: OccupancyGrid):
@@ -165,27 +172,40 @@ class LocalPathPlanner(Node):
         return None
 
     def path_is_blocked(self, cx, cy):
+        """True if the path ahead of the vehicle hits occupied map cells."""
         if self.grid is None or self.grid_info is None:
             return False
 
+        n = len(cx)
+        if n < 2:
+            return False
+
+        fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
+        start_idx = closest_path_index(fx, fy, cx, cy, start_idx=0, search_ahead=n)
+
         res = self.grid_info.resolution
-        step = max(1, int(np.floor(res / self.ds)))
+        step = max(1, int(np.floor(res / self.path_ds)))
         hits = 0
         samples = 0
-        for i in range(0, len(cx), step):
+        dist = 0.0
+        i = start_idx
+        prev_i = start_idx
+        while i < n and dist < self.obs_horizon:
             cg = self._world_to_grid(cx[i], cy[i])
-            if cg is None:
-                continue
-            col, row = cg
-            samples += 1
-            cell = int(self.grid[row, col])
-            if cell < 0:
-                continue
-            if cell >= OCCUPANCY_THRESHOLD:
-                hits += 1
+            if cg is not None:
+                col, row = cg
+                samples += 1
+                if int(self.grid[row, col]) >= OCCUPANCY_OCCUPIED_MIN:
+                    hits += 1
+
+            if i > start_idx:
+                dist += float(np.hypot(cx[i] - cx[prev_i], cy[i] - cy[prev_i]))
+            prev_i = i
+            i += step
+
         if samples == 0:
             return False
-        return hits > samples * 0.25
+        return hits > samples * self.obs_blocked_frac
 
     def _shift_waypoints(self, offset):
         ax = np.asarray(self.ax, dtype=float)
@@ -210,7 +230,7 @@ class LocalPathPlanner(Node):
 
         for offset in LATERAL_OFFSETS:
             sx, sy = self._shift_waypoints(offset)
-            cx, cy, cyaw, ck = generate_cubic_path(sx, sy, self.ds)
+            cx, cy, cyaw, ck = generate_cubic_path(sx, sy, self.path_ds)
             n = min(len(cx), len(cy), len(cyaw), len(ck))
             cx, cy, cyaw, ck = cx[:n], cy[:n], cyaw[:n], ck[:n]
             if not self.path_is_blocked(cx, cy):
@@ -220,15 +240,19 @@ class LocalPathPlanner(Node):
 
         if chosen_cx is None:
             sx, sy = self._shift_waypoints(0.0)
-            chosen_cx, chosen_cy, chosen_cyaw, chosen_ck = generate_cubic_path(sx, sy, self.ds)
+            chosen_cx, chosen_cy, chosen_cyaw, chosen_ck = generate_cubic_path(
+                sx, sy, self.path_ds)
             n = min(len(chosen_cx), len(chosen_cy), len(chosen_cyaw), len(chosen_ck))
             chosen_cx = chosen_cx[:n]
             chosen_cy = chosen_cy[:n]
             chosen_cyaw = chosen_cyaw[:n]
             chosen_ck = chosen_ck[:n]
             chosen_offset = 0.0
-            self.target_vel = self.avoid_vel * 0.5
-            self.get_logger().warn('All lateral offsets blocked -- slowing to crawl.')
+            self.target_vel = self.cruise_vel
+            self.get_logger().warn(
+                'Map marks all lateral offsets blocked -- keeping reference path at cruise speed.',
+                throttle_duration_sec=5.0,
+            )
         elif chosen_offset != 0.0:
             self.target_vel = self.avoid_vel
             self.get_logger().info(f'Path blocked, deviating by {chosen_offset:+.1f} m')

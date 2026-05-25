@@ -223,7 +223,10 @@ class LocalPathPlanner(Node):
         self.path_cx = chosen_cx
         self.path_cy = chosen_cy
         self.path_ck = chosen_ck
-        self.closest_idx = 0
+
+        fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
+        self.closest_idx = closest_path_index(
+            fx, fy, self.path_cx, self.path_cy, 0, 60)
 
         target_path = Path2D()
         viz_path = Path()

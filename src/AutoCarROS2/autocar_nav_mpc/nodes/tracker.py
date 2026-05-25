@@ -17,7 +17,9 @@ from autocar_nav_mpc.path_tracking import (
     frenet_errors,
     front_axle_pose,
     limit_steering_rate,
+    path_index_on_update,
     path_tangent_heading,
+    smooth_steering,
     speed_scale_from_errors,
 )
 from autocar_nav_mpc.yaw_to_quaternion import yaw_to_quaternion
@@ -62,6 +64,9 @@ class MPCPathTracker(Node):
                     ('velocity_gain', None, desc),
                     ('cruise_velocity', None, desc),
                     ('startup_ramp_s', None, desc),
+                    ('steer_smoothing', None, desc),
+                    ('max_lateral_error_for_full_speed', None, desc),
+                    ('closest_min_advance', None, desc),
                 ],
             )
 
@@ -81,6 +86,12 @@ class MPCPathTracker(Node):
             self.default_speed = self._read_cruise_speed()
             ramp = self.get_parameter('startup_ramp_s').value
             self.startup_ramp_s = float(ramp) if ramp is not None else STARTUP_RAMP_S
+            self.steer_smoothing = float(self.get_parameter('steer_smoothing').value)
+            lat_cap = self.get_parameter('max_lateral_error_for_full_speed').value
+            self.lat_err_cap = (
+                float(lat_cap) if lat_cap is not None else MAX_LATERAL_ERROR_FOR_FULL_SPEED
+            )
+            self.closest_min_advance = float(self.get_parameter('closest_min_advance').value)
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
@@ -153,24 +164,37 @@ class MPCPathTracker(Node):
                     and self.cx[-1] == poses[-1].x and self.cy[-1] == poses[-1].y
                 ):
                     return
+
+            old_cx, old_cy = self.cx, self.cy
+            old_idx = self.closest_idx
+
             self.cx = [p.x for p in poses]
             self.cy = [p.y for p in poses]
             self.cyaw = [p.theta for p in poses]
             self._path_version += 1
-            self.closest_idx = self._initial_path_index()
-            self.mpc.reset()
+
+            if self.x is None:
+                self.closest_idx = 0
+            else:
+                fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
+                self.closest_idx = path_index_on_update(
+                    fx, fy, self.cx, self.cy, old_cx, old_cy, old_idx, self.search_ahead)
+
+            if old_cx and old_idx < len(old_cx):
+                jump = np.hypot(
+                    self.cx[self.closest_idx] - old_cx[old_idx],
+                    self.cy[self.closest_idx] - old_cy[old_idx],
+                )
+                if jump >= 4.0:
+                    self.prev_steer = 0.0
+                    self.mpc.reset()
+            else:
+                self.mpc.reset()
+
             if self.cx:
                 self.get_logger().info(
                     f'Path received ({len(self.cx)} points, start_idx={self.closest_idx})'
                 )
-
-    def _initial_path_index(self):
-        """Closest path index (full search) so we don't lock to index 0 at spawn."""
-        if not self.cx or self.x is None:
-            return 0
-        fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
-        d2 = [(fx - px) ** 2 + (fy - py) ** 2 for px, py in zip(self.cx, self.cy)]
-        return int(np.argmin(d2))
 
     def target_vel_cb(self, msg):
         with self.lock:
@@ -219,6 +243,7 @@ class MPCPathTracker(Node):
             fx, fy, cx, cy,
             start_idx=closest_idx,
             search_ahead=self.search_ahead,
+            min_advance=self.closest_min_advance,
         )
 
         e_y, e_psi = frenet_errors(
@@ -229,14 +254,17 @@ class MPCPathTracker(Node):
         speed = max(vel, 0.5)
 
         steer = self.mpc.solve(e_y, e_psi, speed, kappa_seq)
+        steer = smooth_steering(steer, prev_steer, self.steer_smoothing)
         steer = limit_steering_rate(
             steer, prev_steer, self.dt, self.steer_rate_limit)
         steer = float(np.clip(steer, -self.max_steer, self.max_steer))
 
         err_scale = speed_scale_from_errors(e_y, e_psi)
-        lat_cap = min(1.0, MAX_LATERAL_ERROR_FOR_FULL_SPEED / max(abs(e_y), 0.1))
+        lat_cap = min(1.0, self.lat_err_cap / max(abs(e_y), 0.1))
+        steer_margin = 1.0 - min(1.0, abs(steer) / max(self.max_steer, 0.1))
         cmd_vel = (
-            target_vel * self.velocity_gain * err_scale * lat_cap * boot
+            target_vel * self.velocity_gain * err_scale * lat_cap
+            * (0.6 + 0.4 * steer_margin) * boot
         )
         cmd_vel = float(np.clip(cmd_vel, 0.0, target_vel * self.velocity_gain))
 

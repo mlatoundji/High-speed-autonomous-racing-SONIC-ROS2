@@ -32,7 +32,6 @@ class GlobalPathPlanner(Node):
                     ('waypoints_ahead', None, desc),
                     ('waypoints_behind', None, desc),
                     ('passed_threshold', None, desc),
-                    ('waypoints', None, desc),
                     ('centreofgravity_to_frontaxle', None, desc),
                 ],
             )
@@ -45,9 +44,15 @@ class GlobalPathPlanner(Node):
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
 
+        self.declare_parameter('waypoints_file', 'waypoints.csv')
+        waypoints_filename = str(self.get_parameter('waypoints_file').value)
         dir_path = os.path.join(
-            get_package_share_directory('autocar_nav_pure_pursuit'),
-            'data', 'waypoints.csv')
+            get_package_share_directory('autocar_racing_line'),
+            'data',
+            waypoints_filename,
+        )
+        self.get_logger().info(
+            f'Loading waypoints from autocar_racing_line: {waypoints_filename}')
         df = pd.read_csv(dir_path)
 
         self.ax = df['X-axis'].values.tolist()
@@ -59,6 +64,7 @@ class GlobalPathPlanner(Node):
         self.x = None
         self.y = None
         self.theta = None
+        self._publish_key = None
 
     def vehicle_state_cb(self, msg):
         self.x = msg.pose.x
@@ -74,31 +80,40 @@ class GlobalPathPlanner(Node):
         dy = [fy - icy for icy in self.ay]
 
         d = np.hypot(dx, dy)
-        closest_id = np.argmin(d)
+        closest_id = int(np.argmin(d))
 
         transform = self.frame_transform(
             self.ax[closest_id], self.ay[closest_id], fx, fy, self.theta)
 
         if closest_id < 2:
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Starting Path)')
+            mode = 'start'
             px = self.ax[0:self.wp_published]
             py = self.ay[0:self.wp_published]
 
         elif closest_id > (self.waypoints - self.wp_published):
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Terminating Path)')
+            mode = 'end'
             px = self.ax[-self.wp_published:]
             py = self.ay[-self.wp_published:]
 
         elif transform[1] < (0.0 - self.passed_threshold):
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Passed)')
+            mode = 'passed'
             px = self.ax[closest_id - (self.wp_behind - 1):closest_id + (self.wp_ahead + 1)]
             py = self.ay[closest_id - (self.wp_behind - 1):closest_id + (self.wp_ahead + 1)]
 
         else:
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Approaching)')
+            mode = 'approach'
             px = self.ax[(closest_id - self.wp_behind):(closest_id + self.wp_ahead)]
             py = self.ay[(closest_id - self.wp_behind):(closest_id + self.wp_ahead)]
 
+        publish_key = (closest_id, mode, round(px[0], 2), round(py[0], 2))
+        if publish_key == self._publish_key:
+            return
+        self._publish_key = publish_key
+
+        self.get_logger().info(
+            f'Goals updated: waypoint #{closest_id} ({mode}), {len(px)} points',
+            throttle_duration_sec=2.0,
+        )
         self.publish_goals(px, py)
 
     def frame_transform(self, point_x, point_y, axle_x, axle_y, theta):
@@ -115,6 +130,10 @@ class GlobalPathPlanner(Node):
 
     def publish_goals(self, px, py):
         waypoints = min(len(px), len(py))
+        if waypoints < 2:
+            self.get_logger().warn('Fewer than 2 goals -- local planner will not run')
+            return
+
         goals = Path2D()
 
         viz_goals = PoseArray()
