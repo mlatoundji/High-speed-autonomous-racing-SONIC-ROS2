@@ -1,0 +1,2 @@
+session_id,lap_number,timestamp_iso,duration_s,avg_speed_mps,max_speed_mps,distance_m
+2026-05-25T12-11-07,1,2026-05-25T12:14:26,190.000,3.435,5.852,652.56

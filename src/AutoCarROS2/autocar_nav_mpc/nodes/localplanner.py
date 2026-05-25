@@ -142,8 +142,15 @@ class LocalPathPlanner(Node):
         self.yaw = msg.pose.theta
 
     def goals_cb(self, msg):
-        self.ax = [p.x for p in msg.poses]
-        self.ay = [p.y for p in msg.poses]
+        ax = [p.x for p in msg.poses]
+        ay = [p.y for p in msg.poses]
+        if (
+            len(ax) == len(self.ax) and len(ax) >= 2
+            and np.allclose(ax, self.ax) and np.allclose(ay, self.ay)
+        ):
+            return
+        self.ax = ax
+        self.ay = ay
         self.publish_path()
 
     def _world_to_grid(self, x, y):
@@ -163,14 +170,22 @@ class LocalPathPlanner(Node):
 
         res = self.grid_info.resolution
         step = max(1, int(np.floor(res / self.ds)))
+        hits = 0
+        samples = 0
         for i in range(0, len(cx), step):
             cg = self._world_to_grid(cx[i], cy[i])
             if cg is None:
                 continue
             col, row = cg
-            if self.grid[row, col] >= OCCUPANCY_THRESHOLD:
-                return True
-        return False
+            samples += 1
+            cell = int(self.grid[row, col])
+            if cell < 0:
+                continue
+            if cell >= OCCUPANCY_THRESHOLD:
+                hits += 1
+        if samples == 0:
+            return False
+        return hits > samples * 0.25
 
     def _shift_waypoints(self, offset):
         ax = np.asarray(self.ax, dtype=float)
@@ -248,6 +263,10 @@ class LocalPathPlanner(Node):
 
         self.local_planner_pub.publish(target_path)
         self.path_viz_pub.publish(viz_path)
+        self.get_logger().info(
+            f'Published path ({len(chosen_cx)} points, v_target={self.target_vel:.1f} m/s)',
+            throttle_duration_sec=3.0,
+        )
 
 
 def main(args=None):

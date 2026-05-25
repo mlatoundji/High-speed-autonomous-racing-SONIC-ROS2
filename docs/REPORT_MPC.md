@@ -79,4 +79,4 @@ ros2 launch launches race_mpc_launch.py
 
 ## Data
 
-[`../results/lap_times_mpc.csv`](../results/lap_times_mpc.csv) — update this file and the tables above after new runs.
+[`../results/`](../results/) — each run is `results/mpc_<run_id>/` (`params.yml`, `lap_times.csv`). Legacy flat `lap_times_mpc.csv` may still exist from older sessions.

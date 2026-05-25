@@ -10,16 +10,21 @@ from rclpy.node import Node
 from std_msgs.msg import Float64
 
 from autocar_msgs.msg import Path2D, State2D
-from autocar_nav_mpc.mpc import LinearMPCController
+from autocar_nav_mpc.mpc import GAZEBO_MAX_STEER, LinearMPCController
 from autocar_nav_mpc.path_tracking import (
-    build_curvature_profile,
     closest_path_index,
-    curvature_horizon,
+    curvature_horizon_from_path,
     frenet_errors,
     front_axle_pose,
     limit_steering_rate,
+    path_tangent_heading,
+    speed_scale_from_errors,
 )
 from autocar_nav_mpc.yaw_to_quaternion import yaw_to_quaternion
+
+DEFAULT_CRUISE_SPEED = 8.0
+STARTUP_RAMP_S = 4.0
+MAX_LATERAL_ERROR_FOR_FULL_SPEED = 3.0
 
 
 class MPCPathTracker(Node):
@@ -55,6 +60,8 @@ class MPCPathTracker(Node):
                     ('steering_limits', None, desc),
                     ('steering_rate_limit', None, desc),
                     ('velocity_gain', None, desc),
+                    ('cruise_velocity', None, desc),
+                    ('startup_ramp_s', None, desc),
                 ],
             )
 
@@ -67,9 +74,13 @@ class MPCPathTracker(Node):
             self.q_epsi = float(self.get_parameter('q_epsi').value)
             self.r_delta = float(self.get_parameter('r_delta').value)
             self.r_ddelta = float(self.get_parameter('r_ddelta').value)
-            self.max_steer = float(self.get_parameter('steering_limits').value)
+            steer_param = float(self.get_parameter('steering_limits').value)
+            self.max_steer = min(steer_param, GAZEBO_MAX_STEER)
             self.steer_rate_limit = float(self.get_parameter('steering_rate_limit').value)
             self.velocity_gain = float(self.get_parameter('velocity_gain').value)
+            self.default_speed = self._read_cruise_speed()
+            ramp = self.get_parameter('startup_ramp_s').value
+            self.startup_ramp_s = float(ramp) if ramp is not None else STARTUP_RAMP_S
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
@@ -78,15 +89,17 @@ class MPCPathTracker(Node):
         self.y = None
         self.yaw = None
         self.vel = 0.0
-        self.target_vel = 0.0
+        self.target_vel = self.default_speed
 
         self.cx = []
         self.cy = []
         self.cyaw = []
-        self.ck = []
 
         self.closest_idx = 0
-        self.prev_steer = None
+        self.prev_steer = 0.0
+        self._warn_counter = 0
+        self._control_ticks = 0
+        self._path_version = 0
 
         self.dt = 1.0 / self.frequency
         self.mpc = LinearMPCController(
@@ -101,68 +114,139 @@ class MPCPathTracker(Node):
             max_steer_rate=self.steer_rate_limit,
         )
 
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.timer = self.create_timer(self.dt, self.timer_cb)
+        self.get_logger().info(
+            f'MPC tracker ready ({self.frequency:.0f} Hz, '
+            f'cruise={self.default_speed:.1f} m/s, ramp={self.startup_ramp_s:.0f}s)'
+        )
+
+    def _read_cruise_speed(self):
+        if not self.has_parameter('cruise_velocity'):
+            return DEFAULT_CRUISE_SPEED
+        value = self.get_parameter('cruise_velocity').value
+        if value is None:
+            return DEFAULT_CRUISE_SPEED
+        try:
+            speed = float(value)
+        except (TypeError, ValueError):
+            return DEFAULT_CRUISE_SPEED
+        return speed if speed > 0.0 else DEFAULT_CRUISE_SPEED
 
     def timer_cb(self):
         self.mpc_control()
 
     def vehicle_state_cb(self, msg):
-        self.lock.acquire()
-        self.x = msg.pose.x
-        self.y = msg.pose.y
-        self.yaw = msg.pose.theta
-        self.vel = np.sqrt(msg.twist.x ** 2.0 + msg.twist.y ** 2.0)
-        self.lock.release()
+        with self.lock:
+            self.x = msg.pose.x
+            self.y = msg.pose.y
+            self.yaw = msg.pose.theta
+            self.vel = np.sqrt(msg.twist.x ** 2.0 + msg.twist.y ** 2.0)
 
     def path_cb(self, msg):
-        self.lock.acquire()
-        self.cx = [p.x for p in msg.poses]
-        self.cy = [p.y for p in msg.poses]
-        self.cyaw = [p.theta for p in msg.poses]
-        self.ck = build_curvature_profile(self.cx, self.cy)
-        self.closest_idx = 0
-        self.mpc.reset()
-        self.prev_steer = None
-        self.lock.release()
+        poses = msg.poses
+        with self.lock:
+            new_len = len(poses)
+            if new_len == len(self.cx) and new_len > 0:
+                if (
+                    self.cx[0] == poses[0].x and self.cy[0] == poses[0].y
+                    and self.cx[-1] == poses[-1].x and self.cy[-1] == poses[-1].y
+                ):
+                    return
+            self.cx = [p.x for p in poses]
+            self.cy = [p.y for p in poses]
+            self.cyaw = [p.theta for p in poses]
+            self._path_version += 1
+            self.closest_idx = self._initial_path_index()
+            self.mpc.reset()
+            if self.cx:
+                self.get_logger().info(
+                    f'Path received ({len(self.cx)} points, start_idx={self.closest_idx})'
+                )
+
+    def _initial_path_index(self):
+        """Closest path index (full search) so we don't lock to index 0 at spawn."""
+        if not self.cx or self.x is None:
+            return 0
+        fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
+        d2 = [(fx - px) ** 2 + (fy - py) ** 2 for px, py in zip(self.cx, self.cy)]
+        return int(np.argmin(d2))
 
     def target_vel_cb(self, msg):
-        self.target_vel = msg.data
+        with self.lock:
+            if msg.data > 0.0:
+                self.target_vel = msg.data
+
+    def _throttled_warn(self, message):
+        self._warn_counter += 1
+        if self._warn_counter <= 5 or self._warn_counter % 200 == 0:
+            self.get_logger().warn(message)
+
+    def _startup_blend(self):
+        if self.startup_ramp_s <= 0.0:
+            return 1.0
+        return min(1.0, self._control_ticks / (self.startup_ramp_s * self.frequency))
 
     def mpc_control(self):
-        self.lock.acquire()
+        self._control_ticks += 1
+        boot = self._startup_blend()
 
-        if self.x is None or not self.cx:
-            self.lock.release()
+        with self.lock:
+            if self.x is None:
+                self._throttled_warn('Waiting for /autocar/state2D (check /autocar/odom)')
+                return
+
+            x = self.x
+            y = self.y
+            yaw = self.yaw
+            vel = self.vel
+            target_vel = self.target_vel
+            cx = list(self.cx)
+            cy = list(self.cy)
+            cyaw = list(self.cyaw)
+            closest_idx = self.closest_idx
+            prev_steer = self.prev_steer
+
+        if not cx:
+            speed = boot * 0.5 * self.default_speed * self.velocity_gain
+            self._publish_command(speed, 0.0)
+            self._throttled_warn('Waiting for /autocar/path (check goals & local_planner)')
             return
 
-        fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
+        fx, fy = front_axle_pose(x, y, yaw, self.cg2frontaxle)
 
-        self.closest_idx = closest_path_index(
-            fx, fy, self.cx, self.cy,
-            start_idx=self.closest_idx,
+        closest_idx = closest_path_index(
+            fx, fy, cx, cy,
+            start_idx=closest_idx,
             search_ahead=self.search_ahead,
         )
 
         e_y, e_psi = frenet_errors(
-            fx, fy, self.yaw, self.cx, self.cy, self.cyaw, self.closest_idx)
+            fx, fy, yaw, cx, cy, cyaw, closest_idx)
 
-        kappa_seq = curvature_horizon(self.ck, self.closest_idx, self.horizon)
-        speed = max(self.vel, 0.5)
+        kappa_seq = curvature_horizon_from_path(
+            cx, cy, closest_idx, self.horizon)
+        speed = max(vel, 0.5)
 
         steer = self.mpc.solve(e_y, e_psi, speed, kappa_seq)
         steer = limit_steering_rate(
-            steer, self.prev_steer, self.dt, self.steer_rate_limit)
-        self.prev_steer = steer
+            steer, prev_steer, self.dt, self.steer_rate_limit)
         steer = float(np.clip(steer, -self.max_steer, self.max_steer))
 
-        ref_yaw = self.cyaw[self.closest_idx]
-        self._publish_lateral_ref(self.cx[self.closest_idx], self.cy[self.closest_idx], ref_yaw)
+        err_scale = speed_scale_from_errors(e_y, e_psi)
+        lat_cap = min(1.0, MAX_LATERAL_ERROR_FOR_FULL_SPEED / max(abs(e_y), 0.1))
+        cmd_vel = (
+            target_vel * self.velocity_gain * err_scale * lat_cap * boot
+        )
+        cmd_vel = float(np.clip(cmd_vel, 0.0, target_vel * self.velocity_gain))
 
-        cmd_vel = self.target_vel * self.velocity_gain
+        ref_yaw = path_tangent_heading(cyaw[closest_idx])
+        self._publish_lateral_ref(cx[closest_idx], cy[closest_idx], ref_yaw)
         self._publish_command(cmd_vel, steer)
 
-        self.lock.release()
+        with self.lock:
+            self.closest_idx = closest_idx
+            self.prev_steer = steer
 
     def _publish_lateral_ref(self, x, y, yaw):
         pose = PoseStamped()
@@ -176,8 +260,8 @@ class MPCPathTracker(Node):
 
     def _publish_command(self, velocity, steering_angle):
         drive = Twist()
-        drive.linear.x = velocity
-        drive.angular.z = steering_angle
+        drive.linear.x = float(velocity)
+        drive.angular.z = float(steering_angle)
         self.tracker_pub.publish(drive)
 
 

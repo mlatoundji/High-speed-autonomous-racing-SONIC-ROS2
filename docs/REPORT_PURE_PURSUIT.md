@@ -75,4 +75,4 @@ ros2 launch launches race_pure_pursuit_launch.py
 
 ## Data
 
-[`../results/lap_times_pure_pursuit.csv`](../results/lap_times_pure_pursuit.csv) — update this file and the tables above after new runs.
+[`../results/`](../results/) — each run is `results/pure_pursuit_<run_id>/` (`params.yml`, `lap_times.csv`).

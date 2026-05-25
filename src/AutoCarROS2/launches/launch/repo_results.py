@@ -1,8 +1,7 @@
-"""Resolve repo results/ for launch-time lap_timer parameters."""
+"""Resolve repo results/ and prepare per-run output for lap_timer."""
 
 import os
 
-# Keep in sync with autocar_nav.lap_times_paths
 _RESULTS_DIR = 'results'
 
 
@@ -17,10 +16,30 @@ def repo_results_dir():
         os.path.dirname(__file__), '..', '..', '..', '..', _RESULTS_DIR))
 
 
-def lap_timer_parameters(stack, use_sim_time):
-    results = repo_results_dir()
+def _use_sim_time_for_params(use_sim_time):
+    if isinstance(use_sim_time, bool):
+        return use_sim_time
+    if isinstance(use_sim_time, str):
+        return use_sim_time.lower() in ('true', '1', 'yes')
+    return None
+
+
+def lap_timer_parameters(stack, use_sim_time, navconfig_path=None, run_id=None):
+    """Create ``results/<stack>_<run_id>/`` and return lap_timer ROS parameters."""
+    from autocar_nav.lap_times_paths import prepare_run_directory
+
+    run_dir, resolved_run_id = prepare_run_directory(
+        stack,
+        navconfig_path=navconfig_path,
+        use_sim_time=_use_sim_time_for_params(use_sim_time),
+        run_id=run_id,
+    )
+
+    lap_times_csv = run_dir / 'lap_times.csv'
     return {
         'use_sim_time': use_sim_time,
         'stack': stack,
-        'lap_times_csv': os.path.join(results, f'lap_times_{stack}.csv'),
+        'run_id': resolved_run_id,
+        'run_dir': str(run_dir),
+        'lap_times_csv': str(lap_times_csv),
     }

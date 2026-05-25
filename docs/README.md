@@ -1,6 +1,6 @@
 # Documentation layout
 
-Reports live under `docs/`; lap-time CSV logs live under [`results/`](../results/) (see [`lap_times_paths.py`](../src/AutoCarROS2/autocar_nav/autocar_nav/lap_times_paths.py)).
+Reports live under `docs/`; lap-time run logs live under [`results/`](../results/) (see [`lap_times_paths.py`](../src/AutoCarROS2/autocar_nav/autocar_nav/lap_times_paths.py)).
 
 ```
 docs/
@@ -11,11 +11,13 @@ docs/
 results/
 ├── README.md
 ├── lap_times_baseline.csv      # frozen reference (not written by lap_timer)
-├── lap_times_stanley.csv       # live logs, stack=stanley
-├── lap_times_mpc.csv           # live logs, stack=mpc
-└── lap_times_pure_pursuit.csv
+└── <stack>_<run_id>/          # per run (created at launch)
+    ├── params.yml
+    └── lap_times.csv
 ```
 
-`lap_timer` appends completed laps to `results/lap_times_<stack>.csv` for `stanley`, `mpc`, or `pure_pursuit`. Compare CSVs manually or update the `REPORT_*.md` files.
+`lap_timer` appends completed laps to `results/<stack>_<run_id>/lap_times.csv`.  
+Launch creates the run directory and writes `params.yml` from the stack's `navigation_params.yaml`.  
+Compare runs manually or update the `REPORT_*.md` files.
 
 Set `AUTOCAR_REPO_ROOT` to the repo root if path auto-detection fails (e.g. Docker).

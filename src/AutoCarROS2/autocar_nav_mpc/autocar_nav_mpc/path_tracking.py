@@ -19,8 +19,13 @@ def front_axle_pose(x, y, yaw, cg_to_front):
 
 
 def vehicle_heading(yaw):
-    """Heading angle in the odom x-y frame."""
+    """Heading angle in the odom x-y frame (+y-aligned body yaw to driving heading)."""
     return yaw + np.pi * 0.5
+
+
+def path_tangent_heading(path_theta):
+    """Driving heading in x-y from Path2D.theta (cubic spline arctan2(dy, dx))."""
+    return float(path_theta)
 
 
 def closest_path_index(fx, fy, cx, cy, start_idx=0, search_ahead=80):
@@ -50,7 +55,7 @@ def frenet_errors(fx, fy, yaw, cx, cy, cyaw, idx):
     """Signed lateral and heading error at the front axle w.r.t. path index."""
     idx = int(np.clip(idx, 0, len(cx) - 1))
     psi = vehicle_heading(yaw)
-    psi_ref = vehicle_heading(cyaw[idx])
+    psi_ref = path_tangent_heading(cyaw[idx])
 
     dx = fx - cx[idx]
     dy = fy - cy[idx]
@@ -106,6 +111,18 @@ def curvature_horizon(ck, start_idx, horizon):
     return seq
 
 
+def curvature_horizon_from_path(cx, cy, start_idx, horizon):
+    """Curvature samples along the path without building a full profile."""
+    n = len(cx)
+    if n < 2:
+        return [0.0] * horizon
+    start_idx = int(np.clip(start_idx, 0, n - 1))
+    return [
+        estimate_curvature(cx, cy, min(start_idx + k, n - 1))
+        for k in range(horizon)
+    ]
+
+
 def peak_curvature(ck, start_idx, end_idx, smooth_window=5):
     """Peak |kappa| with moving-average filter."""
     segment = [abs(k) for k in ck[start_idx:end_idx]]
@@ -138,8 +155,16 @@ def apply_speed_ramp(current, target, dt, accel_rate, decel_rate):
 
 def limit_steering_rate(steer, prev_steer, dt, rate_limit):
     """Clamp steering change per cycle for stable high-speed tracking."""
-    if rate_limit <= 0.0 or prev_steer is None:
+    if rate_limit <= 0.0:
         return steer
+    prev = 0.0 if prev_steer is None else float(prev_steer)
     max_delta = rate_limit * dt
-    delta = np.clip(steer - prev_steer, -max_delta, max_delta)
-    return float(prev_steer + delta)
+    delta = np.clip(steer - prev, -max_delta, max_delta)
+    return float(prev + delta)
+
+
+def speed_scale_from_errors(e_y, e_psi, lateral_soft=4.0, heading_soft=0.6):
+    """Reduce cruise speed when far from the path (0..1)."""
+    lat = float(np.exp(-abs(e_y) / max(lateral_soft, 0.5)))
+    head = float(np.exp(-abs(e_psi) / max(heading_soft, 0.1)))
+    return lat * head

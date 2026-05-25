@@ -36,6 +36,8 @@ path_tracker:
         q_epsi: 25.0
         r_delta: 0.08
         r_ddelta: 1.2
-        steering_limits: 0.95
-        steering_rate_limit: 3.0
+        steering_limits: 0.85
+        steering_rate_limit: 1.5
         velocity_gain: 1.0
+        cruise_velocity: 8.0
+        startup_ramp_s: 4.0

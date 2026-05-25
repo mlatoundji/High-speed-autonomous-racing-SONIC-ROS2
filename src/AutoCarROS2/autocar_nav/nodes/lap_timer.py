@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Lap timer for the race circuit.
 
-Detects start/finish crossings and appends rows to results/lap_times_<stack>.csv.
+Detects start/finish crossings and appends rows to
+``results/<stack>_<run_id>/lap_times.csv``.
 
 Publishes:
     /autocar/lap_time          (Float64)  -- last completed lap, in s
@@ -20,7 +21,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float64, Int32
 
 from autocar_msgs.msg import State2D
-from autocar_nav.lap_times_paths import LAP_TIMES_CSV_FIELDS, lap_log_paths
+from autocar_nav.lap_times_paths import LAP_TIMES_CSV_FIELDS, init_lap_times_csv, lap_log_paths
 
 
 CSV_FIELDS = list(LAP_TIMES_CSV_FIELDS)
@@ -43,25 +44,36 @@ class LapTimer(Node):
             namespace='',
             parameters=[
                 ('stack', 'unknown', desc),
+                ('run_id', '', desc),
+                ('run_dir', '', desc),
                 ('lap_times_csv', '', desc),
             ],
         )
 
         self.stack = str(self.get_parameter('stack').value)
+        run_id = str(self.get_parameter('run_id').value).strip()
+        run_dir = str(self.get_parameter('run_dir').value).strip()
         csv_override = str(self.get_parameter('lap_times_csv').value).strip()
 
-        override = csv_override or None
-        self._csv_targets, self._in_project_repo = lap_log_paths(self.stack, override)
+        lap_times_csv = csv_override or None
+        if not lap_times_csv and run_dir:
+            lap_times_csv = str(Path(run_dir) / 'lap_times.csv')
+
+        self._csv_targets, self._in_project_repo = lap_log_paths(
+            self.stack,
+            run_dir=run_dir or None,
+            lap_times_csv=lap_times_csv,
+        )
 
         if not self._csv_targets:
             raise RuntimeError(
-                f'lap_timer: unknown stack {self.stack!r}. '
+                f'lap_timer: unknown stack {self.stack!r} or missing run_dir. '
                 f'Use one of: stanley, mpc, pure_pursuit.')
 
-        self.session_id = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        self.session_id = run_id or datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         for path in self._csv_targets:
             path.parent.mkdir(parents=True, exist_ok=True)
-            self._ensure_csv_header(path)
+            init_lap_times_csv(path)
 
         if not self._in_project_repo:
             self.get_logger().warn(
@@ -87,25 +99,13 @@ class LapTimer(Node):
 
         self.timer = self.create_timer(1.0 / LIVE_TIMER_HZ, self._publish_live)
 
+        run_label = self._csv_targets[0].parent.name
         self.get_logger().info(
-            f'Lap timer armed (stack={self.stack}). Start/finish: x={START_X:.2f}, '
+            f'Lap timer armed (stack={self.stack}, run={run_label}). '
+            f'Start/finish: x={START_X:.2f}, '
             f'y in [{-ROAD_HALF_WIDTH:+.1f}, {ROAD_HALF_WIDTH:+.1f}], +Y crossing. '
             f'CSV: {self._csv_targets[0]}'
         )
-
-    def _ensure_csv_header(self, csv_path: Path):
-        if csv_path.exists():
-            with csv_path.open(newline='') as f:
-                header = next(csv.reader(f), None)
-            if header == CSV_FIELDS:
-                return
-            self.get_logger().warn(
-                f'{csv_path.name}: header {header!r} differs from expected; '
-                'new rows use the standard 7-column format.')
-            return
-
-        with csv_path.open('w', newline='') as f:
-            csv.writer(f).writerow(CSV_FIELDS)
 
     def state_cb(self, msg: State2D):
         x = msg.pose.x
@@ -183,7 +183,7 @@ class LapTimer(Node):
         ]
 
         for csv_path in self._csv_targets:
-            with csv_path.open('a', newline='') as f:
+            with csv_path.open('a', newline='', encoding='utf-8') as f:
                 csv.writer(f).writerow(row)
 
         self.lap_start_time = now
