@@ -28,6 +28,43 @@ def path_tangent_heading(path_theta):
     return float(path_theta)
 
 
+def closest_waypoint_index_closed(px, py, ax, ay, start_idx=0, search_ahead=30):
+    """Forward closest waypoint on a closed loop (index wraps)."""
+    n = len(ax)
+    if n == 0:
+        return 0
+
+    start_idx = int(np.clip(start_idx, 0, n - 1))
+    best_idx = start_idx
+    best_d2 = (ax[start_idx] - px) ** 2 + (ay[start_idx] - py) ** 2
+
+    for k in range(1, search_ahead + 1):
+        idx = (start_idx + k) % n
+        d2 = (ax[idx] - px) ** 2 + (ay[idx] - py) ** 2
+        if d2 <= best_d2:
+            best_d2 = d2
+            best_idx = idx
+        else:
+            break
+
+    return best_idx
+
+
+def anchor_path_index(px, py, cx, cy, prev_idx=0, search_ahead=120, reanchor_dist=6.0):
+    """Closest point on an open path; re-anchor globally if the forward window is stale."""
+    n = len(cx)
+    if n == 0:
+        return 0
+
+    idx = closest_path_index(px, py, cx, cy, prev_idx, search_ahead)
+    dist = float(np.hypot(cx[idx] - px, cy[idx] - py))
+    if dist > reanchor_dist:
+        arr_x = np.asarray(cx, dtype=float)
+        arr_y = np.asarray(cy, dtype=float)
+        idx = int(np.argmin((arr_x - px) ** 2 + (arr_y - py) ** 2))
+    return idx
+
+
 def closest_path_index(fx, fy, cx, cy, start_idx=0, search_ahead=80, min_advance=0):
     """Forward-only closest-point search for path tracking stability."""
     n = len(cx)

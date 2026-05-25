@@ -11,6 +11,7 @@ from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 from autocar_msgs.msg import Path2D, State2D
+from autocar_nav_mpc.path_tracking import closest_waypoint_index_closed
 
 
 class GlobalPathPlanner(Node):
@@ -33,6 +34,7 @@ class GlobalPathPlanner(Node):
                     ('waypoints_behind', None, desc),
                     ('passed_threshold', None, desc),
                     ('centreofgravity_to_frontaxle', None, desc),
+                    ('waypoint_search_ahead', None, desc),
                 ],
             )
 
@@ -40,6 +42,7 @@ class GlobalPathPlanner(Node):
             self.wp_behind = int(self.get_parameter('waypoints_behind').value)
             self.passed_threshold = float(self.get_parameter('passed_threshold').value)
             self.cg2frontaxle = float(self.get_parameter('centreofgravity_to_frontaxle').value)
+            self.search_ahead = int(self.get_parameter('waypoint_search_ahead').value)
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
@@ -60,6 +63,7 @@ class GlobalPathPlanner(Node):
 
         self.waypoints = min(len(self.ax), len(self.ay))
         self.wp_published = self.wp_ahead + self.wp_behind
+        self.closest_id = 0
 
         self.x = None
         self.y = None
@@ -76,8 +80,12 @@ class GlobalPathPlanner(Node):
         fx = self.x + self.cg2frontaxle * -np.sin(self.theta)
         fy = self.y + self.cg2frontaxle * np.cos(self.theta)
 
-        d = np.hypot(self.ax - fx, self.ay - fy)
-        closest_id = int(np.argmin(d))
+        self.closest_id = closest_waypoint_index_closed(
+            fx, fy, self.ax, self.ay,
+            start_idx=self.closest_id,
+            search_ahead=self.search_ahead,
+        )
+        closest_id = self.closest_id
 
         transform = self.frame_transform(
             self.ax[closest_id], self.ay[closest_id], fx, fy, self.theta)

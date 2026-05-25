@@ -62,5 +62,5 @@ ros2 launch launches race_launch.py
 
 ## Data
 
-Frozen: `[../results/lap_times_baseline.csv](../results/lap_times_baseline.csv)`  
+Reference session: `[../results/baseline_2026-05-20T22-07-12/lap_times.csv](../results/baseline_2026-05-20T22-07-12/lap_times.csv)`  
 Live Stanley logs: `[../results/`](../results/) — `results/stanley_<run_id>/` per session

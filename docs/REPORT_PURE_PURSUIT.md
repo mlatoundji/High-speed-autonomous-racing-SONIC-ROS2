@@ -1,6 +1,6 @@
 # Pure Pursuit — `autocar_nav_pure_pursuit` vs Stanley baseline
 
-Compared to [`REPORT_BASELINE.md`](REPORT_BASELINE.md) / [`lap_times_baseline.csv`](../results/lap_times_baseline.csv).  
+Compared to [`REPORT_BASELINE.md`](REPORT_BASELINE.md) / [`baseline_2026-05-20T22-07-12`](../results/baseline_2026-05-20T22-07-12/lap_times.csv).  
 Recorded **2026-05-24**, session `2026-05-24T17-00-14`. Only **lap 1** is logged so far.
 
 ## Configuration

@@ -7,8 +7,6 @@ Layout (per run):
             params.yml       # run metadata + navigation ROS parameters
             lap_times.csv    # one row per completed lap
 
-    results/lap_times_baseline.csv   # frozen reference (repo marker only)
-
 run_id format: ``YYYY-MM-DDTHH-MM-SS`` (local time, no timezone).
 """
 
@@ -17,7 +15,6 @@ from datetime import datetime
 from pathlib import Path
 
 RESULTS_DIRNAME = 'results'
-BASELINE_NAME = 'lap_times_baseline.csv'
 REPORT_BASELINE_NAME = 'REPORT_BASELINE.md'
 
 RUN_LAP_TIMES_NAME = 'lap_times.csv'
@@ -53,10 +50,6 @@ def results_dir(root: Path) -> Path:
     return root / RESULTS_DIRNAME
 
 
-def baseline_csv_in_repo(root: Path) -> Path:
-    return results_dir(root) / BASELINE_NAME
-
-
 def run_dir_path(stack, run_id=None, results_root=None, line=None):
     """Absolute path to ``results/<stack>_<run_id>/`` (or with line suffix)."""
     base = Path(results_root) if results_root else resolve_lap_times_dir()
@@ -72,16 +65,17 @@ def run_params_yml(run_dir: Path) -> Path:
     return Path(run_dir) / RUN_PARAMS_NAME
 
 
-def _repo_markers(root: Path):
-    return (root / 'docs' / REPORT_BASELINE_NAME, baseline_csv_in_repo(root))
+def _repo_root_ok(root: Path) -> bool:
+    report = root / 'docs' / REPORT_BASELINE_NAME
+    return report.is_file() and results_dir(root).is_dir()
 
 
 def find_repo_root():
-    """Return repo root when docs/ + results/ match the expected layout."""
+    """Return repo root when docs/REPORT_BASELINE.md and results/ exist."""
     env_root = os.environ.get('AUTOCAR_REPO_ROOT')
     if env_root:
         root = Path(env_root).expanduser().resolve()
-        if all(m.is_file() for m in _repo_markers(root)):
+        if _repo_root_ok(root):
             return root
 
     results_env = os.environ.get('AUTOCAR_RESULTS_DIR')
@@ -90,19 +84,19 @@ def find_repo_root():
         if results.is_file():
             results = results.parent
         root = results.parent
-        if all(m.is_file() for m in _repo_markers(root)):
+        if _repo_root_ok(root):
             return root
 
     for start in (Path(__file__).resolve(), Path.cwd()):
         for parent in (start, *start.parents):
-            if all(m.is_file() for m in _repo_markers(parent)):
+            if _repo_root_ok(parent):
                 return parent
 
     try:
         from ament_index_python.packages import get_package_share_directory
         share = Path(get_package_share_directory('autocar_nav')).resolve()
         for parent in (share, *share.parents):
-            if all(m.is_file() for m in _repo_markers(parent)):
+            if _repo_root_ok(parent):
                 return parent
     except Exception:
         pass

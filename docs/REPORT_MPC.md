@@ -1,6 +1,6 @@
 # MPC — `autocar_nav_mpc` vs Stanley baseline
 
-Compared to [`REPORT_BASELINE.md`](REPORT_BASELINE.md) / [`lap_times_baseline.csv`](../results/lap_times_baseline.csv).  
+Compared to [`REPORT_BASELINE.md`](REPORT_BASELINE.md) / [`baseline_2026-05-20T22-07-12`](../results/baseline_2026-05-20T22-07-12/lap_times.csv).  
 Recorded **2026-05-24**, session `2026-05-24T11-37-34`. Tables below use **lap 1** unless noted.
 
 ## Configuration

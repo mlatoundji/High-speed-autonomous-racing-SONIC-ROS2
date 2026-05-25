@@ -25,8 +25,7 @@ from autocar_nav_mpc.path_tracking import (
 from autocar_nav_mpc.yaw_to_quaternion import yaw_to_quaternion
 
 DEFAULT_CRUISE_SPEED = 8.0
-STARTUP_RAMP_S = 4.0
-MAX_LATERAL_ERROR_FOR_FULL_SPEED = 3.0
+STARTUP_RAMP_S = 2.0
 
 
 class MPCPathTracker(Node):
@@ -65,7 +64,8 @@ class MPCPathTracker(Node):
                     ('cruise_velocity', None, desc),
                     ('startup_ramp_s', None, desc),
                     ('steer_smoothing', None, desc),
-                    ('max_lateral_error_for_full_speed', None, desc),
+                    ('lateral_soft', None, desc),
+                    ('heading_soft', None, desc),
                     ('closest_min_advance', None, desc),
                 ],
             )
@@ -87,10 +87,8 @@ class MPCPathTracker(Node):
             ramp = self.get_parameter('startup_ramp_s').value
             self.startup_ramp_s = float(ramp) if ramp is not None else STARTUP_RAMP_S
             self.steer_smoothing = float(self.get_parameter('steer_smoothing').value)
-            lat_cap = self.get_parameter('max_lateral_error_for_full_speed').value
-            self.lat_err_cap = (
-                float(lat_cap) if lat_cap is not None else MAX_LATERAL_ERROR_FOR_FULL_SPEED
-            )
+            self.lateral_soft = float(self.get_parameter('lateral_soft').value)
+            self.heading_soft = float(self.get_parameter('heading_soft').value)
             self.closest_min_advance = float(self.get_parameter('closest_min_advance').value)
 
         except ValueError:
@@ -259,14 +257,9 @@ class MPCPathTracker(Node):
             steer, prev_steer, self.dt, self.steer_rate_limit)
         steer = float(np.clip(steer, -self.max_steer, self.max_steer))
 
-        err_scale = speed_scale_from_errors(e_y, e_psi)
-        lat_cap = min(1.0, self.lat_err_cap / max(abs(e_y), 0.1))
-        steer_margin = 1.0 - min(1.0, abs(steer) / max(self.max_steer, 0.1))
-        cmd_vel = (
-            target_vel * self.velocity_gain * err_scale * lat_cap
-            * (0.6 + 0.4 * steer_margin) * boot
-        )
-        cmd_vel = float(np.clip(cmd_vel, 0.0, target_vel * self.velocity_gain))
+        err_scale = speed_scale_from_errors(
+            e_y, e_psi, self.lateral_soft, self.heading_soft)
+        cmd_vel = float(target_vel * self.velocity_gain * boot * err_scale)
 
         ref_yaw = path_tangent_heading(cyaw[closest_idx])
         self._publish_lateral_ref(cx[closest_idx], cy[closest_idx], ref_yaw)

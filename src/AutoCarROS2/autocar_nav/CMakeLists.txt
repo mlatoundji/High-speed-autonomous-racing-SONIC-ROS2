@@ -34,11 +34,6 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(
-  FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../../results/lap_times_baseline.csv
-  DESTINATION share/${PROJECT_NAME}/baseline
-)
-
 install(PROGRAMS
   nodes/globalplanner.py
   nodes/localisation.py

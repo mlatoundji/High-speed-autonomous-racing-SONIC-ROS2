@@ -12,6 +12,7 @@ from std_msgs.msg import Float64
 from autocar_msgs.msg import Path2D, State2D
 from autocar_nav_mpc import generate_cubic_path, yaw_to_quaternion
 from autocar_nav_mpc.path_tracking import (
+    anchor_path_index,
     apply_speed_ramp,
     closest_path_index,
     curvature_speed_limit,
@@ -254,15 +255,17 @@ class LocalPathPlanner(Node):
                 throttle_duration_sec=5.0,
             )
         elif chosen_offset != 0.0:
-            self.target_vel = self.avoid_vel
             self.get_logger().info(f'Path blocked, deviating by {chosen_offset:+.1f} m')
-        else:
-            self.target_vel = self.cruise_vel
+
+        self.target_vel = self.cruise_vel
 
         self.path_cx = chosen_cx
         self.path_cy = chosen_cy
         self.path_ck = chosen_ck
-        self.closest_idx = 0
+
+        fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
+        self.closest_idx = anchor_path_index(
+            fx, fy, self.path_cx, self.path_cy, self.closest_idx, 120)
 
         target_path = Path2D()
         viz_path = Path()

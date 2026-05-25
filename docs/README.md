@@ -9,8 +9,6 @@ docs/
 └── REPORT_PURE_PURSUIT.md      # Pure Pursuit report
 
 results/
-├── README.md
-├── lap_times_baseline.csv      # frozen reference (not written by lap_timer)
 └── <stack>_<run_id>/          # per run (created at launch)
     ├── params.yml
     └── lap_times.csv
