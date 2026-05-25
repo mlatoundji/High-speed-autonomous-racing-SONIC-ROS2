@@ -1,0 +1,21 @@
+benchmark:
+  directory: benchmark_2026-05-25T19-37-58
+  started_at: '2026-05-25T19:37:58'
+  smoke: false
+  config_source: scripts/configs/r1_pp_vs_stanley.yaml
+  default_warmup_laps: 1
+runs:
+- stack: stanley
+  profile: default
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+- stack: pure_pursuit
+  profile: default
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
