@@ -4,7 +4,7 @@ Layout (per run):
 
     results/
         <stack>_<run_id>/
-            params.yml       # run metadata + navigation ROS parameters
+            params.yaml      # run metadata + navigation ROS parameters
             lap_times.csv    # one row per completed lap
 
 run_id format: ``YYYY-MM-DDTHH-MM-SS`` (local time, no timezone).
@@ -18,11 +18,11 @@ RESULTS_DIRNAME = 'results'
 REPORT_BASELINE_NAME = 'REPORT_BASELINE.md'
 
 RUN_LAP_TIMES_NAME = 'lap_times.csv'
-RUN_PARAMS_NAME = 'params.yml'
+RUN_PARAMS_NAME = 'params.yaml'
 
 KNOWN_STACKS = frozenset({'stanley', 'mpc', 'pure_pursuit'})
 
-LAP_TIMES_CSV_FIELDS = (
+LAP_TIMES_LEGACY_FIELDS = (
     'session_id',
     'lap_number',
     'timestamp_iso',
@@ -31,6 +31,19 @@ LAP_TIMES_CSV_FIELDS = (
     'max_speed_mps',
     'distance_m',
 )
+
+LAP_TIMES_EXTRA_FIELDS = (
+    'controller',
+    'profile',
+    'latency_ms',
+    'odom_noise_std',
+    'lateral_error_rms',
+    'lateral_error_max',
+    'steering_rate_max',
+    'offtrack_events',
+)
+
+LAP_TIMES_CSV_FIELDS = LAP_TIMES_LEGACY_FIELDS + LAP_TIMES_EXTRA_FIELDS
 
 
 def make_run_id(when=None):
@@ -147,8 +160,18 @@ def _dump_yaml(path, data):
         yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
 
-def write_run_params(run_dir, stack, run_id, navconfig_path=None, use_sim_time=None, line=None):
-    """Write ``params.yml`` for a new run directory."""
+def write_run_params(
+    run_dir,
+    stack,
+    run_id,
+    navconfig_path=None,
+    use_sim_time=None,
+    line=None,
+    profile=None,
+    latency_ms=None,
+    odom_noise_std=None,
+):
+    """Write ``params.yaml`` for a new run directory."""
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     dest = run_params_yml(run_dir)
@@ -165,6 +188,12 @@ def write_run_params(run_dir, stack, run_id, navconfig_path=None, use_sim_time=N
             use_sim_time, bool) else str(use_sim_time)
     if line is not None:
         payload['run']['line'] = str(line)
+    if profile is not None:
+        payload['run']['profile'] = str(profile)
+    if latency_ms is not None:
+        payload['run']['latency_ms'] = int(latency_ms)
+    if odom_noise_std is not None:
+        payload['run']['odom_noise_std'] = float(odom_noise_std)
 
     nav_path = None
     if navconfig_path:
@@ -196,18 +225,48 @@ def write_run_params(run_dir, stack, run_id, navconfig_path=None, use_sim_time=N
 
 
 def init_lap_times_csv(csv_path):
-    """Create ``lap_times.csv`` with a header row if missing or empty."""
+    """Create or migrate ``lap_times.csv`` to the 15-column schema."""
     import csv
     csv_path = Path(csv_path)
-    if csv_path.exists() and csv_path.stat().st_size > 0:
-        return
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open('w', newline='', encoding='utf-8') as f:
-        csv.writer(f).writerow(LAP_TIMES_CSV_FIELDS)
+
+    if not csv_path.exists() or csv_path.stat().st_size == 0:
+        with csv_path.open('w', newline='', encoding='utf-8') as f:
+            csv.writer(f).writerow(LAP_TIMES_CSV_FIELDS)
+        return
+
+    with csv_path.open('r', newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        try:
+            header = next(reader)
+        except StopIteration:
+            header = []
+        rows = list(reader)
+
+    if header == list(LAP_TIMES_CSV_FIELDS):
+        return
+
+    if header == list(LAP_TIMES_LEGACY_FIELDS):
+        pad = [''] * len(LAP_TIMES_EXTRA_FIELDS)
+        with csv_path.open('w', newline='', encoding='utf-8') as f:
+            w = csv.writer(f)
+            w.writerow(LAP_TIMES_CSV_FIELDS)
+            for row in rows:
+                w.writerow(row + pad)
+        return
 
 
-def prepare_run_directory(stack, navconfig_path=None, use_sim_time=None, run_id=None, line=None):
-    """Create ``results/<stack>_<run_id>/`` with ``params.yml`` and ``lap_times.csv``.
+def prepare_run_directory(
+    stack,
+    navconfig_path=None,
+    use_sim_time=None,
+    run_id=None,
+    line=None,
+    profile=None,
+    latency_ms=None,
+    odom_noise_std=None,
+):
+    """Create ``results/<stack>_<run_id>/`` with ``params.yaml`` and ``lap_times.csv``.
 
     Returns:
         (run_dir, run_id) as ``Path`` and ``str``.
@@ -217,7 +276,17 @@ def prepare_run_directory(stack, navconfig_path=None, use_sim_time=None, run_id=
             f'Unknown stack {stack!r}; expected one of: {sorted(KNOWN_STACKS)}')
 
     run_dir, rid = run_dir_path(stack, run_id=run_id, line=line)
-    write_run_params(run_dir, stack, rid, navconfig_path, use_sim_time=use_sim_time, line=line)
+    write_run_params(
+        run_dir,
+        stack,
+        rid,
+        navconfig_path,
+        use_sim_time=use_sim_time,
+        line=line,
+        profile=profile,
+        latency_ms=latency_ms,
+        odom_noise_std=odom_noise_std,
+    )
     init_lap_times_csv(run_lap_times_csv(run_dir))
     return run_dir, rid
 

@@ -75,4 +75,4 @@ ros2 launch launches race_pure_pursuit_launch.py
 
 ## Data
 
-[`../results/`](../results/) — each run is `results/pure_pursuit_<run_id>/` (`params.yml`, `lap_times.csv`).
+[`../results/`](../results/) — each run is `results/pure_pursuit_<run_id>/` (`params.yaml`, `lap_times.csv`).

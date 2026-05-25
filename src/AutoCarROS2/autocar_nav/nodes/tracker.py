@@ -22,6 +22,7 @@ class PathTracker(Node):
         # Initialise publishers
         self.tracker_pub = self.create_publisher(Twist, '/autocar/cmd_vel', 10)
         self.lateral_ref_pub = self.create_publisher(PoseStamped, '/autocar/lateral_ref', 10)
+        self.lateral_error_pub = self.create_publisher(Float64, '/autocar/lateral_error', 10)
 
         # Initialise subscribers
         self.localisation_sub = self.create_subscription(State2D, '/autocar/state2D', self.vehicle_state_cb, 10)
@@ -132,7 +133,11 @@ class PathTracker(Node):
         # Heading error
         self.heading_error = normalise_angle(self.cyaw[target_idx] - self.yaw - np.pi * 0.5)
         self.target_idx = target_idx
-    
+
+        err_msg = Float64()
+        err_msg.data = float(self.crosstrack_error)
+        self.lateral_error_pub.publish(err_msg)
+
         pose = PoseStamped()
         pose.header.frame_id = "odom"
         pose.header.stamp = self.get_clock().now().to_msg()

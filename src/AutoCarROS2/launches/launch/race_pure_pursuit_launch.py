@@ -5,7 +5,7 @@ import sys
 _LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
 if _LAUNCH_DIR not in sys.path:
     sys.path.insert(0, _LAUNCH_DIR)
-from race_launch_common import navigation_nodes  # noqa: E402
+from race_launch_common import experiment_launch_arguments, navigation_nodes  # noqa: E402
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -65,6 +65,7 @@ def generate_launch_description():
             default_value='centerline',
             description='Waypoint track: centerline or racing.',
         ),
+        *experiment_launch_arguments(),
 
         Node(
             package='robot_state_publisher',

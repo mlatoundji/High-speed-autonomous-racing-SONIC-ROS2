@@ -12,3 +12,5 @@ src/*
 
 # Claude Code runtime data
 .claude/scheduled_tasks.lock
+
+__pycache__

@@ -41,6 +41,8 @@ install(PROGRAMS
   nodes/clickplanner.py
   nodes/tracker.py
   nodes/lap_timer.py
+  nodes/latency_injector.py
+  nodes/odom_noise_injector.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

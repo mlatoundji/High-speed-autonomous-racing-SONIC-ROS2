@@ -1,14 +1,39 @@
 """Shared helpers for race stack launch files (centerline / racing line)."""
 
+from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch.substitutions import LaunchConfiguration
 
 from repo_results import lap_timer_parameters
+
+INJECTOR_PKG = 'autocar_nav'
 
 WAYPOINTS_FILES = {
     'centerline': 'waypoints.csv',
     'racing': 'waypoints_racing.csv',
 }
+
+
+def experiment_launch_arguments():
+    """Launch args for experiment metadata and perception perturbations."""
+    return [
+        DeclareLaunchArgument(
+            'profile',
+            default_value='default',
+            description='Tuning profile label (recorded in lap_times.csv).',
+        ),
+        DeclareLaunchArgument(
+            'latency_ms',
+            default_value='0',
+            description='Artificial perception latency in ms (0 = pass-through).',
+        ),
+        DeclareLaunchArgument(
+            'odom_noise_std',
+            default_value='0.0',
+            description='Gaussian noise std on state2D pose (0 = pass-through).',
+        ),
+    ]
 
 
 def resolve_waypoints_file(line: str) -> str:
@@ -23,6 +48,9 @@ def navigation_nodes(context, navpkg, stack, navconfig):
     line = LaunchConfiguration('line').perform(context)
     waypoints_file = resolve_waypoints_file(line)
     use_sim_time = LaunchConfiguration('use_sim_time')
+    profile = LaunchConfiguration('profile').perform(context)
+    latency_ms = int(LaunchConfiguration('latency_ms').perform(context))
+    odom_noise_std = float(LaunchConfiguration('odom_noise_std').perform(context))
     mappkg = 'autocar_map'
 
     planner_params = [
@@ -31,10 +59,27 @@ def navigation_nodes(context, navpkg, stack, navconfig):
         {'waypoints_file': waypoints_file},
     ]
 
+    injector_params = {'use_sim_time': use_sim_time}
+
     return [
         Node(
             package=navpkg, name='localisation', executable='localisation.py',
             parameters=[navconfig, {'use_sim_time': use_sim_time}],
+            remappings=[('/autocar/state2D', '/autocar/state2D_raw')],
+        ),
+        Node(
+            package=INJECTOR_PKG, name='latency_injector',
+            executable='latency_injector.py',
+            parameters=[injector_params, {
+                'latency_ms': ParameterValue(latency_ms, value_type=int),
+            }],
+        ),
+        Node(
+            package=INJECTOR_PKG, name='odom_noise_injector',
+            executable='odom_noise_injector.py',
+            parameters=[injector_params, {
+                'odom_noise_std': ParameterValue(odom_noise_std, value_type=float),
+            }],
         ),
         Node(
             package=navpkg, name='global_planner', executable='globalplanner.py',
@@ -57,7 +102,15 @@ def navigation_nodes(context, navpkg, stack, navconfig):
             name='lap_timer',
             executable='lap_timer.py',
             parameters=[
-                lap_timer_parameters(stack, use_sim_time, navconfig, line=line),
+                lap_timer_parameters(
+                    stack,
+                    use_sim_time,
+                    navconfig,
+                    line=line,
+                    profile=profile,
+                    latency_ms=latency_ms,
+                    odom_noise_std=odom_noise_std,
+                ),
             ],
         ),
     ]

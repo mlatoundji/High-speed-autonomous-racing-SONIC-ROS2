@@ -36,6 +36,7 @@ class MPCPathTracker(Node):
 
         self.tracker_pub = self.create_publisher(Twist, '/autocar/cmd_vel', 10)
         self.lateral_ref_pub = self.create_publisher(PoseStamped, '/autocar/lateral_ref', 10)
+        self.lateral_error_pub = self.create_publisher(Float64, '/autocar/lateral_error', 10)
 
         self.localisation_sub = self.create_subscription(
             State2D, '/autocar/state2D', self.vehicle_state_cb, 10)
@@ -263,6 +264,9 @@ class MPCPathTracker(Node):
 
         ref_yaw = path_tangent_heading(cyaw[closest_idx])
         self._publish_lateral_ref(cx[closest_idx], cy[closest_idx], ref_yaw)
+        lat_err = Float64()
+        lat_err.data = float(e_y)
+        self.lateral_error_pub.publish(lat_err)
         self._publish_command(cmd_vel, steer)
 
         with self.lock:

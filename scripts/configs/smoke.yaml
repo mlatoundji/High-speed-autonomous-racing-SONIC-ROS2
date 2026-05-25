@@ -1,0 +1,12 @@
+# Single-lap smoke test (Stanley, centerline, no perturbations).
+#
+#   python3 scripts/benchmark.py --smoke
+#   python3 scripts/benchmark.py --config scripts/configs/smoke.yaml
+
+- stack: stanley
+  profile: default
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 1
+  warmup_laps: 0

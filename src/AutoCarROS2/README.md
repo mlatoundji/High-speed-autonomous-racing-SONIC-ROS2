@@ -85,6 +85,7 @@ $ colcon build --packages-select autocar_racing_line autocar_nav launches --syml
 $ source install/setup.bash
 $ ros2 launch launches race_launch.py line:=centerline
 $ ros2 launch launches race_launch.py line:=racing
+$ ros2 launch launches race_launch.py line:=racing latency_ms:=200 profile:=default odom_noise_std:=0.0
 
 # MPC race stack
 $ colcon build --packages-select autocar_racing_line autocar_nav autocar_nav_mpc launches --symlink-install
@@ -93,6 +94,10 @@ $ ros2 launch launches race_mpc_launch.py line:=racing
 # Pure Pursuit race stack
 $ colcon build --packages-select autocar_racing_line autocar_nav autocar_nav_pure_pursuit launches --symlink-install
 $ ros2 launch launches race_pure_pursuit_launch.py line:=racing
+
+# Automated benchmarks (from repo root, after colcon build)
+$ python3 scripts/benchmark.py --smoke
+$ python3 scripts/benchmark.py --config scripts/configs/r4_latency_sweep.yaml
 
 # Regenerate waypoints_racing.csv from centerline
 $ ros2 run autocar_racing_line generate_racing_line.py
@@ -104,9 +109,9 @@ $ ros2 run autocar_racing_line generate_racing_line.py
 |-----------|-------|
 |`default_launch.py`|Complete pipeline with preset waypoints|
 |`click_launch.py`|Interactive pipeline for testing and fun|
-|`race_launch.py`|Race circuit with Stanley tracker; `line:=centerline\|racing`|
-|`race_mpc_launch.py`|Race circuit with MPC tracker; `line:=centerline\|racing`|
-|`race_pure_pursuit_launch.py`|Race circuit with Pure Pursuit tracker; `line:=centerline\|racing`|
+|`race_launch.py`|Stanley; `line`, `profile`, `latency_ms`, `odom_noise_std`|
+|`race_mpc_launch.py`|MPC; same experiment args|
+|`race_pure_pursuit_launch.py`|Pure Pursuit; same experiment args|
 
 ## Packages
 

@@ -1,0 +1,16 @@
+# R3 (optional) — Pure Pursuit + racing line integration coupling
+#
+# REPORT Section 5.4: PP lookahead + inward racing line often fails by lap 2.
+# Run separately from r3_racing_line.yaml to avoid a long combined batch.
+#
+#   python3 scripts/benchmark.py --config scripts/configs/r3_pp_racing_optional.yaml
+#
+# Wall-clock: ~9 min
+
+- stack: pure_pursuit
+  profile: default
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
