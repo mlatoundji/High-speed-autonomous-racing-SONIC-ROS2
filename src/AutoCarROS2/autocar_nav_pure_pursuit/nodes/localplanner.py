@@ -22,6 +22,9 @@ from autocar_nav_pure_pursuit.pure_pursuit import (
 LATERAL_OFFSETS = [0.0, 1.5, -1.5, 3.0, -3.0, 4.5, -4.5, 6.0, -6.0]
 OCCUPANCY_THRESHOLD = 50
 
+# Keep cruise == avoid so lateral path switches do not jerk target speed
+# (see need_for_speed localplanner notes).
+
 
 class LocalPathPlanner(Node):
 
@@ -215,10 +218,10 @@ class LocalPathPlanner(Node):
             self.target_vel = self.avoid_vel * 0.5
             self.get_logger().warn('All lateral offsets blocked -- slowing to crawl.')
         elif chosen_offset != 0.0:
-            self.target_vel = self.avoid_vel
             self.get_logger().info(f'Path blocked, deviating by {chosen_offset:+.1f} m')
-        else:
-            self.target_vel = self.cruise_vel
+
+        # Steady cruise: geometric deviation handles obstacles; speed stays constant.
+        self.target_vel = self.cruise_vel
 
         self.path_cx = chosen_cx
         self.path_cy = chosen_cy

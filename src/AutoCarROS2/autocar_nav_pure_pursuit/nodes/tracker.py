@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Pure Pursuit path tracker.
+
+Adopts the proven control loop from ``need_for_speed`` (measured-speed lookahead,
+full target velocity tracking) while keeping forward-only path indexing and
+arc-length lookahead interpolation from this package.
+"""
 
 import threading
 
@@ -13,24 +19,18 @@ from autocar_msgs.msg import Path2D, State2D
 from autocar_nav_pure_pursuit.pure_pursuit import (
     closest_path_index,
     dynamic_lookahead,
-    estimate_curvature,
     find_lookahead_point,
-    frenet_errors,
     front_axle_pose,
     initial_path_index,
     lateral_error_front_axle,
     limit_steering_rate,
-    lookahead_curvature_scale,
     pure_pursuit_steering,
     rear_axle_pose,
     smooth_steering,
-    speed_scale_from_errors,
 )
 from autocar_nav_pure_pursuit.yaw_to_quaternion import yaw_to_quaternion
 
-STARTUP_RAMP_S = 4.0
-MAX_LATERAL_ERROR_FOR_FULL_SPEED = 2.5
-CURVATURE_LOOKAHEAD_POINTS = 40
+STARTUP_RAMP_S = 2.0
 
 
 class PurePursuitTracker(Node):
@@ -68,7 +68,6 @@ class PurePursuitTracker(Node):
                     ('steer_smoothing', None, desc),
                     ('velocity_gain', None, desc),
                     ('startup_ramp_s', None, desc),
-                    ('max_lateral_error_for_full_speed', None, desc),
                 ],
             )
 
@@ -86,10 +85,6 @@ class PurePursuitTracker(Node):
             self.velocity_gain = float(self.get_parameter('velocity_gain').value)
             ramp = self.get_parameter('startup_ramp_s').value
             self.startup_ramp_s = float(ramp) if ramp is not None else STARTUP_RAMP_S
-            lat_cap = self.get_parameter('max_lateral_error_for_full_speed').value
-            self.lat_err_cap = (
-                float(lat_cap) if lat_cap is not None else MAX_LATERAL_ERROR_FOR_FULL_SPEED
-            )
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
@@ -100,9 +95,9 @@ class PurePursuitTracker(Node):
         self.vel = 0.0
         self.target_vel = 0.0
 
-        self.cx = []
-        self.cy = []
-        self.cyaw = []
+        self.path_x = np.array([])
+        self.path_y = np.array([])
+        self.path_yaw = np.array([])
 
         self.closest_idx = 0
         self.prev_steer = None
@@ -129,38 +124,41 @@ class PurePursuitTracker(Node):
             self.vel = float(np.hypot(msg.twist.x, msg.twist.y))
 
     def path_cb(self, msg):
-        poses = msg.poses
         with self.lock:
-            new_len = len(poses)
-            if new_len == len(self.cx) and new_len > 0:
-                if (
-                    self.cx[0] == poses[0].x and self.cy[0] == poses[0].y
-                    and self.cx[-1] == poses[-1].x and self.cy[-1] == poses[-1].y
-                ):
-                    return
+            new_x = np.array([p.x for p in msg.poses], dtype=float)
+            new_y = np.array([p.y for p in msg.poses], dtype=float)
+            new_yaw = np.array([p.theta for p in msg.poses], dtype=float)
 
-            old_cx, old_cy = self.cx, self.cy
+            if (
+                new_x.size == self.path_x.size
+                and new_x.size > 0
+                and new_x[0] == self.path_x[0]
+                and new_y[0] == self.path_y[0]
+                and new_x[-1] == self.path_x[-1]
+                and new_y[-1] == self.path_y[-1]
+            ):
+                return
+
+            old_x, old_y = self.path_x, self.path_y
             old_idx = self.closest_idx
 
-            self.cx = [p.x for p in poses]
-            self.cy = [p.y for p in poses]
-            self.cyaw = [p.theta for p in poses]
+            self.path_x = new_x
+            self.path_y = new_y
+            self.path_yaw = new_yaw
 
             if self.x is None:
                 self.closest_idx = 0
             else:
                 rx, ry = rear_axle_pose(self.x, self.y, self.yaw, self.cg2rear)
                 self.closest_idx = initial_path_index(
-                    rx, ry, self.cx, self.cy, self.search_ahead)
+                    rx, ry, self.path_x, self.path_y, self.search_ahead)
 
-            if old_cx and old_idx < len(old_cx):
-                jump = np.hypot(
-                    self.cx[self.closest_idx] - old_cx[old_idx],
-                    self.cy[self.closest_idx] - old_cy[old_idx],
-                )
-                if jump < 4.0:
-                    pass
-                else:
+            if old_x.size and old_idx < old_x.size:
+                jump = float(np.hypot(
+                    self.path_x[self.closest_idx] - old_x[old_idx],
+                    self.path_y[self.closest_idx] - old_y[old_idx],
+                ))
+                if jump >= 4.0:
                     self.prev_steer = None
             else:
                 self.prev_steer = None
@@ -174,19 +172,12 @@ class PurePursuitTracker(Node):
             return 1.0
         return min(1.0, self._control_ticks / (self.startup_ramp_s * self.frequency))
 
-    def _peak_curvature_ahead(self, cx, cy, start_idx):
-        end = min(len(cx), start_idx + CURVATURE_LOOKAHEAD_POINTS)
-        kappa = 0.0
-        for i in range(start_idx, end):
-            kappa = max(kappa, abs(estimate_curvature(cx, cy, i)))
-        return kappa
-
     def pure_pursuit_control(self):
         self._control_ticks += 1
         boot = self._startup_blend()
 
         with self.lock:
-            if self.x is None or not self.cx:
+            if self.x is None or self.path_x.size == 0:
                 return
 
             x = self.x
@@ -194,14 +185,17 @@ class PurePursuitTracker(Node):
             yaw = self.yaw
             vel = self.vel
             target_vel = self.target_vel
-            cx = list(self.cx)
-            cy = list(self.cy)
-            cyaw = list(self.cyaw)
+            path_x = self.path_x
+            path_y = self.path_y
+            path_yaw = self.path_yaw
             closest_idx = self.closest_idx
             prev_steer = self.prev_steer
 
         rx, ry = rear_axle_pose(x, y, yaw, self.cg2rear)
         fx, fy = front_axle_pose(x, y, yaw, self.cg2front)
+
+        cx = path_x.tolist()
+        cy = path_y.tolist()
 
         closest_idx = closest_path_index(
             rx, ry, cx, cy,
@@ -209,17 +203,8 @@ class PurePursuitTracker(Node):
             search_ahead=self.search_ahead,
         )
 
-        e_y, e_psi = frenet_errors(fx, fy, yaw, cx, cy, cyaw, closest_idx)
-        lat_err = lateral_error_front_axle(fx, fy, yaw, cx, cy, closest_idx)
-
-        k_peak = self._peak_curvature_ahead(cx, cy, closest_idx)
-        ld_base = dynamic_lookahead(
-            min(max(vel, 0.5), target_vel if target_vel > 0.0 else vel),
-            self.ld_gain,
-            self.ld_min,
-            self.ld_max,
-        )
-        ld = ld_base * lookahead_curvature_scale(k_peak)
+        # Measured speed sets lookahead (natural damping at the current pace).
+        ld = dynamic_lookahead(vel, self.ld_gain, self.ld_min, self.ld_max)
 
         la_idx, tx, ty = find_lookahead_point(
             rx, ry, cx, cy, closest_idx, ld)
@@ -232,16 +217,12 @@ class PurePursuitTracker(Node):
             steer, prev_steer, self.dt, self.steer_rate_limit)
         steer = float(np.clip(steer, -self.max_steer, self.max_steer))
 
-        err_scale = speed_scale_from_errors(e_y, e_psi)
-        lat_cap = min(1.0, self.lat_err_cap / max(abs(e_y), 0.1))
-        steer_margin = 1.0 - min(1.0, abs(steer) / max(self.max_steer, 0.1))
-        cmd_vel = (
-            target_vel * self.velocity_gain * err_scale * lat_cap
-            * (0.55 + 0.45 * steer_margin) * boot
-        )
-        cmd_vel = float(np.clip(cmd_vel, 0.0, target_vel * self.velocity_gain))
+        # Trust the local planner speed profile; only ramp up briefly at launch.
+        cmd_vel = float(target_vel * self.velocity_gain * boot)
 
-        ref_yaw = cyaw[la_idx] if la_idx < len(cyaw) else yaw
+        lat_err = lateral_error_front_axle(fx, fy, yaw, cx, cy, closest_idx)
+
+        ref_yaw = float(path_yaw[la_idx]) if la_idx < len(path_yaw) else yaw
         self._publish_lateral_ref(tx, ty, ref_yaw)
 
         err_msg = Float64()
