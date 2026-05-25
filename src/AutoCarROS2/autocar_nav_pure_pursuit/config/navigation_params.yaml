@@ -20,10 +20,11 @@ local_planner:
 global_planner:
     ros__parameters:
         update_frequency: 2.0
-        waypoints_ahead: 3
+        waypoints_ahead: 5
         waypoints_behind: 2
         passed_threshold: 0.25
         centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
         waypoints_file: waypoints.csv
 
 path_tracker:
@@ -42,3 +43,5 @@ path_tracker:
         steer_smoothing: 1.0
         velocity_gain: 1.0
         startup_ramp_s: 2.0
+        lateral_soft: 4.0
+        heading_soft: 0.6

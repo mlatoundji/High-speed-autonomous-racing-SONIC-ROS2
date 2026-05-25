@@ -11,6 +11,7 @@ from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 from autocar_msgs.msg import Path2D, State2D
+from autocar_nav_pure_pursuit.pure_pursuit import closest_waypoint_index_closed
 
 
 class GlobalPathPlanner(Node):
@@ -33,6 +34,7 @@ class GlobalPathPlanner(Node):
                     ('waypoints_behind', None, desc),
                     ('passed_threshold', None, desc),
                     ('centreofgravity_to_frontaxle', None, desc),
+                    ('waypoint_search_ahead', None, desc),
                 ],
             )
 
@@ -40,6 +42,7 @@ class GlobalPathPlanner(Node):
             self.wp_behind = int(self.get_parameter('waypoints_behind').value)
             self.passed_threshold = float(self.get_parameter('passed_threshold').value)
             self.cg2frontaxle = float(self.get_parameter('centreofgravity_to_frontaxle').value)
+            self.search_ahead = int(self.get_parameter('waypoint_search_ahead').value)
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
@@ -55,11 +58,12 @@ class GlobalPathPlanner(Node):
             f'Loading waypoints from autocar_racing_line: {waypoints_filename}')
         df = pd.read_csv(dir_path)
 
-        self.ax = df['X-axis'].values.tolist()
-        self.ay = df['Y-axis'].values.tolist()
+        self.ax = np.asarray(df['X-axis'].values, dtype=float)
+        self.ay = np.asarray(df['Y-axis'].values, dtype=float)
 
         self.waypoints = min(len(self.ax), len(self.ay))
         self.wp_published = self.wp_ahead + self.wp_behind
+        self.closest_id = 0
 
         self.x = None
         self.y = None
@@ -76,11 +80,12 @@ class GlobalPathPlanner(Node):
         fx = self.x + self.cg2frontaxle * -np.sin(self.theta)
         fy = self.y + self.cg2frontaxle * np.cos(self.theta)
 
-        dx = [fx - icx for icx in self.ax]
-        dy = [fy - icy for icy in self.ay]
-
-        d = np.hypot(dx, dy)
-        closest_id = int(np.argmin(d))
+        self.closest_id = closest_waypoint_index_closed(
+            fx, fy, self.ax, self.ay,
+            start_idx=self.closest_id,
+            search_ahead=self.search_ahead,
+        )
+        closest_id = self.closest_id
 
         transform = self.frame_transform(
             self.ax[closest_id], self.ay[closest_id], fx, fy, self.theta)
@@ -97,15 +102,19 @@ class GlobalPathPlanner(Node):
 
         elif transform[1] < (0.0 - self.passed_threshold):
             mode = 'passed'
-            px = self.ax[closest_id - (self.wp_behind - 1):closest_id + (self.wp_ahead + 1)]
-            py = self.ay[closest_id - (self.wp_behind - 1):closest_id + (self.wp_ahead + 1)]
+            lo = closest_id - (self.wp_behind - 1)
+            hi = closest_id + (self.wp_ahead + 1)
+            px = self.ax[lo:hi]
+            py = self.ay[lo:hi]
 
         else:
             mode = 'approach'
-            px = self.ax[(closest_id - self.wp_behind):(closest_id + self.wp_ahead)]
-            py = self.ay[(closest_id - self.wp_behind):(closest_id + self.wp_ahead)]
+            lo = closest_id - self.wp_behind
+            hi = closest_id + self.wp_ahead
+            px = self.ax[lo:hi]
+            py = self.ay[lo:hi]
 
-        publish_key = (closest_id, mode, round(px[0], 2), round(py[0], 2))
+        publish_key = (closest_id, mode, round(float(px[0]), 2), round(float(py[0]), 2))
         if publish_key == self._publish_key:
             return
         self._publish_key = publish_key
@@ -121,12 +130,10 @@ class GlobalPathPlanner(Node):
         s = np.sin(-theta)
         R = np.array(((c, -s), (s, c)))
 
-        p = np.array(((point_x), (point_y)))
-        v = np.array(((axle_x), (axle_y)))
+        p = np.array((point_x, point_y))
+        v = np.array((axle_x, axle_y))
         vp = p - v
-        transform = R.dot(vp)
-
-        return transform
+        return R.dot(vp)
 
     def publish_goals(self, px, py):
         waypoints = min(len(px), len(py))
@@ -142,13 +149,13 @@ class GlobalPathPlanner(Node):
 
         for i in range(waypoints):
             goal = Pose2D()
-            goal.x = px[i]
-            goal.y = py[i]
+            goal.x = float(px[i])
+            goal.y = float(py[i])
             goals.poses.append(goal)
 
             vpose = Pose()
-            vpose.position.x = px[i]
-            vpose.position.y = py[i]
+            vpose.position.x = float(px[i])
+            vpose.position.y = float(py[i])
             vpose.position.z = 0.0
             viz_goals.poses.append(vpose)
 

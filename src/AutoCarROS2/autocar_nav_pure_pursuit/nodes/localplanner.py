@@ -12,6 +12,7 @@ from std_msgs.msg import Float64
 from autocar_msgs.msg import Path2D, State2D
 from autocar_nav_pure_pursuit import generate_cubic_path, yaw_to_quaternion
 from autocar_nav_pure_pursuit.pure_pursuit import (
+    anchor_path_index,
     apply_speed_ramp,
     closest_path_index,
     curvature_speed_limit,
@@ -228,8 +229,8 @@ class LocalPathPlanner(Node):
         self.path_ck = chosen_ck
 
         fx, fy = front_axle_pose(self.x, self.y, self.yaw, self.cg2frontaxle)
-        self.closest_idx = closest_path_index(
-            fx, fy, self.path_cx, self.path_cy, 0, 60)
+        self.closest_idx = anchor_path_index(
+            fx, fy, self.path_cx, self.path_cy, self.closest_idx, 120)
 
         target_path = Path2D()
         viz_path = Path()

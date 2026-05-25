@@ -17,16 +17,18 @@ from std_msgs.msg import Float64
 
 from autocar_msgs.msg import Path2D, State2D
 from autocar_nav_pure_pursuit.pure_pursuit import (
+    anchor_path_index,
     closest_path_index,
     dynamic_lookahead,
     find_lookahead_point,
+    frenet_errors,
     front_axle_pose,
-    initial_path_index,
     lateral_error_front_axle,
     limit_steering_rate,
     pure_pursuit_steering,
     rear_axle_pose,
     smooth_steering,
+    speed_scale_from_errors,
 )
 from autocar_nav_pure_pursuit.yaw_to_quaternion import yaw_to_quaternion
 
@@ -68,6 +70,8 @@ class PurePursuitTracker(Node):
                     ('steer_smoothing', None, desc),
                     ('velocity_gain', None, desc),
                     ('startup_ramp_s', None, desc),
+                    ('lateral_soft', None, desc),
+                    ('heading_soft', None, desc),
                 ],
             )
 
@@ -85,6 +89,8 @@ class PurePursuitTracker(Node):
             self.velocity_gain = float(self.get_parameter('velocity_gain').value)
             ramp = self.get_parameter('startup_ramp_s').value
             self.startup_ramp_s = float(ramp) if ramp is not None else STARTUP_RAMP_S
+            self.lateral_soft = float(self.get_parameter('lateral_soft').value)
+            self.heading_soft = float(self.get_parameter('heading_soft').value)
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
@@ -150,8 +156,9 @@ class PurePursuitTracker(Node):
                 self.closest_idx = 0
             else:
                 rx, ry = rear_axle_pose(self.x, self.y, self.yaw, self.cg2rear)
-                self.closest_idx = initial_path_index(
-                    rx, ry, self.path_x, self.path_y, self.search_ahead)
+                self.closest_idx = anchor_path_index(
+                    rx, ry, self.path_x.tolist(), self.path_y.tolist(),
+                    self.closest_idx, self.search_ahead)
 
             if old_x.size and old_idx < old_x.size:
                 jump = float(np.hypot(
@@ -203,6 +210,9 @@ class PurePursuitTracker(Node):
             search_ahead=self.search_ahead,
         )
 
+        e_y, e_psi = frenet_errors(
+            fx, fy, yaw, cx, cy, path_yaw.tolist(), closest_idx)
+
         # Measured speed sets lookahead (natural damping at the current pace).
         ld = dynamic_lookahead(vel, self.ld_gain, self.ld_min, self.ld_max)
 
@@ -217,8 +227,9 @@ class PurePursuitTracker(Node):
             steer, prev_steer, self.dt, self.steer_rate_limit)
         steer = float(np.clip(steer, -self.max_steer, self.max_steer))
 
-        # Trust the local planner speed profile; only ramp up briefly at launch.
-        cmd_vel = float(target_vel * self.velocity_gain * boot)
+        # Soft cap when far from path (important on offset racing line at spawn).
+        err_scale = speed_scale_from_errors(e_y, e_psi, self.lateral_soft, self.heading_soft)
+        cmd_vel = float(target_vel * self.velocity_gain * boot * err_scale)
 
         lat_err = lateral_error_front_axle(fx, fy, yaw, cx, cy, closest_idx)
 
