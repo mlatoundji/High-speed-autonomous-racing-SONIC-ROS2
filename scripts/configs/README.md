@@ -17,7 +17,7 @@ Output: `[results/benchmark_<timestamp>/](../../results/)` (`config.yaml`, `summ
 | `[r4_latency_sweep.yaml](r4_latency_sweep.yaml)`           | 5.5 R4      | Stanley, racing                    | `latency_ms`: 0, 100, 200, 300, 500, 1000                                                                         |
 
 
-Historical snapshots: `[benchmark_2026-05-23T16-28-02](../../results/benchmark_2026-05-23T16-28-02)`.
+Historical snapshots: `[results/benchmark_2026-05-23T16-28-02](../../results/benchmark_2026-05-23T16-28-02)`.
 
 ## Run order (full reproduction)
 

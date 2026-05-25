@@ -44,7 +44,10 @@ KNOWN_STACKS: FrozenSet[str] = frozenset(STACK_LAUNCH_FILES)
 VALID_LINES: FrozenSet[str] = frozenset({'centerline', 'racing'})
 
 LAP_TIMEOUT_S = 600.0
-SIM_COOLDOWN_S = 3.0
+SIM_COOLDOWN_S = 5.0
+LAUNCH_SHUTDOWN_TIMEOUT_S = 20.0
+STALE_SIM_TERM_WAIT_S = 3.0
+_STALE_SIM_PROCS = ('gzserver', 'gzclient', 'rviz2')
 
 SMOKE_RUN = {
     'stack': 'stanley',
@@ -205,14 +208,77 @@ def write_benchmark_config(
 # Simulation runner
 # ---------------------------------------------------------------------------
 
-def kill_simulation() -> None:
-    for cmd in (
-        ['killall', '-9', 'gzserver'],
-        ['killall', '-9', 'gzclient'],
-        ['killall', '-9', 'gazebo'],
-        ['pkill', '-9', '-f', 'ros2 launch'],
+def _sim_process_running(name: str) -> bool:
+    result = subprocess.run(
+        ['pgrep', '-x', name],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0
+
+
+def terminate_launch_process(proc: subprocess.Popen) -> None:
+    """Shut down ``ros2 launch`` and its children (Gazebo, RViz, nodes) gracefully."""
+    if proc.poll() is not None:
+        return
+    try:
+        pgid = os.getpgid(proc.pid)
+    except ProcessLookupError:
+        return
+
+    for sig, label in (
+        (signal.SIGINT, 'SIGINT'),
+        (signal.SIGTERM, 'SIGTERM'),
     ):
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if proc.poll() is not None:
+            return
+        _log(f'sending {label} to launch process group')
+        try:
+            os.killpg(pgid, sig)
+        except ProcessLookupError:
+            return
+        try:
+            proc.wait(timeout=LAUNCH_SHUTDOWN_TIMEOUT_S)
+            _log(f'launch exited (code {proc.returncode})')
+            return
+        except subprocess.TimeoutExpired:
+            continue
+
+    if proc.poll() is None:
+        _log('launch still running; sending SIGKILL')
+        try:
+            os.killpg(pgid, signal.SIGKILL)
+            proc.wait(timeout=5)
+        except (ProcessLookupError, subprocess.TimeoutExpired):
+            pass
+
+
+def cleanup_stale_sim_processes() -> None:
+    """Remove orphaned Gazebo / RViz after launch exit.
+
+    Uses SIGTERM first so the next ``ros2 launch`` (which also killall's gz)
+    does not fight frozen ``-9`` windows. SIGKILL only if still alive.
+    """
+    for name in _STALE_SIM_PROCS:
+        if not _sim_process_running(name):
+            continue
+        subprocess.run(
+            ['killall', name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    time.sleep(STALE_SIM_TERM_WAIT_S)
+
+    for name in _STALE_SIM_PROCS:
+        if not _sim_process_running(name):
+            continue
+        _log(f'{name} still running; sending SIGKILL')
+        subprocess.run(
+            ['killall', '-9', name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
 
 def run_dir_prefix(run: BenchmarkRun) -> str:
@@ -263,8 +329,10 @@ def build_launch_command(run: BenchmarkRun) -> str:
 
 
 def execute_run(run: BenchmarkRun, results_root: Path) -> dict:
-    kill_simulation()
-    time.sleep(SIM_COOLDOWN_S)
+    if any(_sim_process_running(name) for name in _STALE_SIM_PROCS):
+        _log('stale Gazebo/RViz detected before launch; cleaning up')
+        cleanup_stale_sim_processes()
+        time.sleep(SIM_COOLDOWN_S)
 
     dirs_before = list_run_dir_names(results_root)
     expected_laps = run.lap_count
@@ -309,15 +377,9 @@ def execute_run(run: BenchmarkRun, results_root: Path) -> dict:
             timed_out = True
             break
 
-    try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    kill_simulation()
+    terminate_launch_process(proc)
+    cleanup_stale_sim_processes()
+    time.sleep(SIM_COOLDOWN_S)
 
     rows = []
     session_id = None
