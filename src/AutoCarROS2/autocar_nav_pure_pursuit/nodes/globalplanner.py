@@ -11,6 +11,7 @@ from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 from autocar_msgs.msg import Path2D, State2D
+from autocar_nav_pure_pursuit.pure_pursuit import closest_waypoint_index_closed
 
 
 class GlobalPathPlanner(Node):
@@ -32,8 +33,8 @@ class GlobalPathPlanner(Node):
                     ('waypoints_ahead', None, desc),
                     ('waypoints_behind', None, desc),
                     ('passed_threshold', None, desc),
-                    ('waypoints', None, desc),
                     ('centreofgravity_to_frontaxle', None, desc),
+                    ('waypoint_search_ahead', None, desc),
                 ],
             )
 
@@ -41,24 +42,33 @@ class GlobalPathPlanner(Node):
             self.wp_behind = int(self.get_parameter('waypoints_behind').value)
             self.passed_threshold = float(self.get_parameter('passed_threshold').value)
             self.cg2frontaxle = float(self.get_parameter('centreofgravity_to_frontaxle').value)
+            self.search_ahead = int(self.get_parameter('waypoint_search_ahead').value)
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
 
+        self.declare_parameter('waypoints_file', 'waypoints.csv')
+        waypoints_filename = str(self.get_parameter('waypoints_file').value)
         dir_path = os.path.join(
-            get_package_share_directory('autocar_nav_pure_pursuit'),
-            'data', 'waypoints.csv')
+            get_package_share_directory('autocar_racing_line'),
+            'data',
+            waypoints_filename,
+        )
+        self.get_logger().info(
+            f'Loading waypoints from autocar_racing_line: {waypoints_filename}')
         df = pd.read_csv(dir_path)
 
-        self.ax = df['X-axis'].values.tolist()
-        self.ay = df['Y-axis'].values.tolist()
+        self.ax = np.asarray(df['X-axis'].values, dtype=float)
+        self.ay = np.asarray(df['Y-axis'].values, dtype=float)
 
         self.waypoints = min(len(self.ax), len(self.ay))
         self.wp_published = self.wp_ahead + self.wp_behind
+        self.closest_id = 0
 
         self.x = None
         self.y = None
         self.theta = None
+        self._publish_key = None
 
     def vehicle_state_cb(self, msg):
         self.x = msg.pose.x
@@ -70,35 +80,49 @@ class GlobalPathPlanner(Node):
         fx = self.x + self.cg2frontaxle * -np.sin(self.theta)
         fy = self.y + self.cg2frontaxle * np.cos(self.theta)
 
-        dx = [fx - icx for icx in self.ax]
-        dy = [fy - icy for icy in self.ay]
-
-        d = np.hypot(dx, dy)
-        closest_id = np.argmin(d)
+        self.closest_id = closest_waypoint_index_closed(
+            fx, fy, self.ax, self.ay,
+            start_idx=self.closest_id,
+            search_ahead=self.search_ahead,
+        )
+        closest_id = self.closest_id
 
         transform = self.frame_transform(
             self.ax[closest_id], self.ay[closest_id], fx, fy, self.theta)
 
         if closest_id < 2:
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Starting Path)')
+            mode = 'start'
             px = self.ax[0:self.wp_published]
             py = self.ay[0:self.wp_published]
 
         elif closest_id > (self.waypoints - self.wp_published):
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Terminating Path)')
+            mode = 'end'
             px = self.ax[-self.wp_published:]
             py = self.ay[-self.wp_published:]
 
         elif transform[1] < (0.0 - self.passed_threshold):
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Passed)')
-            px = self.ax[closest_id - (self.wp_behind - 1):closest_id + (self.wp_ahead + 1)]
-            py = self.ay[closest_id - (self.wp_behind - 1):closest_id + (self.wp_ahead + 1)]
+            mode = 'passed'
+            lo = closest_id - (self.wp_behind - 1)
+            hi = closest_id + (self.wp_ahead + 1)
+            px = self.ax[lo:hi]
+            py = self.ay[lo:hi]
 
         else:
-            self.get_logger().info(f'Closest Waypoint #{closest_id} (Approaching)')
-            px = self.ax[(closest_id - self.wp_behind):(closest_id + self.wp_ahead)]
-            py = self.ay[(closest_id - self.wp_behind):(closest_id + self.wp_ahead)]
+            mode = 'approach'
+            lo = closest_id - self.wp_behind
+            hi = closest_id + self.wp_ahead
+            px = self.ax[lo:hi]
+            py = self.ay[lo:hi]
 
+        publish_key = (closest_id, mode, round(float(px[0]), 2), round(float(py[0]), 2))
+        if publish_key == self._publish_key:
+            return
+        self._publish_key = publish_key
+
+        self.get_logger().info(
+            f'Goals updated: waypoint #{closest_id} ({mode}), {len(px)} points',
+            throttle_duration_sec=2.0,
+        )
         self.publish_goals(px, py)
 
     def frame_transform(self, point_x, point_y, axle_x, axle_y, theta):
@@ -106,15 +130,17 @@ class GlobalPathPlanner(Node):
         s = np.sin(-theta)
         R = np.array(((c, -s), (s, c)))
 
-        p = np.array(((point_x), (point_y)))
-        v = np.array(((axle_x), (axle_y)))
+        p = np.array((point_x, point_y))
+        v = np.array((axle_x, axle_y))
         vp = p - v
-        transform = R.dot(vp)
-
-        return transform
+        return R.dot(vp)
 
     def publish_goals(self, px, py):
         waypoints = min(len(px), len(py))
+        if waypoints < 2:
+            self.get_logger().warn('Fewer than 2 goals -- local planner will not run')
+            return
+
         goals = Path2D()
 
         viz_goals = PoseArray()
@@ -123,13 +149,13 @@ class GlobalPathPlanner(Node):
 
         for i in range(waypoints):
             goal = Pose2D()
-            goal.x = px[i]
-            goal.y = py[i]
+            goal.x = float(px[i])
+            goal.y = float(py[i])
             goals.poses.append(goal)
 
             vpose = Pose()
-            vpose.position.x = px[i]
-            vpose.position.y = py[i]
+            vpose.position.x = float(px[i])
+            vpose.position.y = float(py[i])
             vpose.position.z = 0.0
             viz_goals.poses.append(vpose)
 

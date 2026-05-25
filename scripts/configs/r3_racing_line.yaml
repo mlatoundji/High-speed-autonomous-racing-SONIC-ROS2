@@ -1,0 +1,16 @@
+# R3 — Racing line vs centerline (Stanley, default)
+#
+# Reproduces REPORT.md Section 5.4 / RESULTS.md R3 headline:
+# Stanley + racing line ~172 s vs centerline ~190 s.
+#
+#   python3 scripts/benchmark.py --config scripts/configs/r3_racing_line.yaml
+#
+# Wall-clock: ~9 min (1 launch × 3 laps)
+
+- stack: stanley
+  profile: default
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1

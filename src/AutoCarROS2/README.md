@@ -80,15 +80,27 @@ $ ros2 launch launches default_launch.py
 # Launch the interactive launch file
 $ ros2 launch launches click_launch.py
 
-# Pure Pursuit race stack (build autocar_nav_pure_pursuit first)
-$ colcon build --packages-select autocar_nav autocar_nav_pure_pursuit launches --symlink-install
+# Stanley race stack (line:=centerline or line:=racing)
+$ colcon build --packages-select autocar_racing_line autocar_nav launches --symlink-install
 $ source install/setup.bash
-$ ros2 launch launches race_pure_pursuit_launch.py
+$ ros2 launch launches race_launch.py line:=centerline
+$ ros2 launch launches race_launch.py line:=racing
+$ ros2 launch launches race_launch.py line:=racing latency_ms:=200 profile:=default odom_noise_std:=0.0
 
-# MPC race stack (lap_timer is in autocar_nav)
-$ colcon build --packages-select autocar_nav autocar_nav_mpc launches --symlink-install
-$ source install/setup.bash
-$ ros2 launch launches race_mpc_launch.py
+# MPC race stack
+$ colcon build --packages-select autocar_racing_line autocar_nav autocar_nav_mpc launches --symlink-install
+$ ros2 launch launches race_mpc_launch.py line:=racing
+
+# Pure Pursuit race stack
+$ colcon build --packages-select autocar_racing_line autocar_nav autocar_nav_pure_pursuit launches --symlink-install
+$ ros2 launch launches race_pure_pursuit_launch.py line:=racing
+
+# Automated benchmarks (from repo root, after colcon build)
+$ python3 scripts/benchmark.py --smoke
+$ python3 scripts/benchmark.py --config scripts/configs/r4_latency_sweep.yaml
+
+# Regenerate waypoints_racing.csv from centerline
+$ ros2 run autocar_racing_line generate_racing_line.py
 ```
 
 ## Launch Files
@@ -97,8 +109,9 @@ $ ros2 launch launches race_mpc_launch.py
 |-----------|-------|
 |`default_launch.py`|Complete pipeline with preset waypoints|
 |`click_launch.py`|Interactive pipeline for testing and fun|
-|`race_pure_pursuit_launch.py`|Race circuit with Pure Pursuit tracker (higher speed)|
-|`race_mpc_launch.py`|Race circuit with Model Predictive Control tracker|
+|`race_launch.py`|Stanley; `line`, `profile`, `latency_ms`, `odom_noise_std`|
+|`race_mpc_launch.py`|MPC; same experiment args|
+|`race_pure_pursuit_launch.py`|Pure Pursuit; same experiment args|
 
 ## Packages
 
@@ -112,6 +125,7 @@ $ ros2 launch launches race_mpc_launch.py
 |`autocar_nav`|Contains the navigation stack (Stanley tracker)|
 |`autocar_nav_pure_pursuit`|Pure Pursuit navigation stack (faster, curvature-aware speed)|
 |`autocar_nav_mpc`|Model Predictive Control navigation stack (see [`docs/REPORT_MPC.md`](../../docs/REPORT_MPC.md))|
+|`autocar_racing_line`|Centerline + racing-line waypoint CSVs (`waypoints.csv`, `waypoints_racing.csv`)|
 
 ## Troubleshoot
 

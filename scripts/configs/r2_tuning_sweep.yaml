@@ -1,0 +1,33 @@
+# R2 — Tuning sweep (TEMPORARY placeholder)
+#
+# Reproduces REPORT.md Section 5.3 / RESULTS.md R2 table structure.
+# profile is a CSV label only — navigation_params.yaml is NOT switched yet
+# (REPORT Section 3.3 TODO). All three runs use default Pure Pursuit params.
+#
+#   python3 scripts/benchmark.py --config scripts/configs/r2_tuning_sweep.yaml
+#
+# Wall-clock: ~9–12 min (3 launches × ~3 min/lap)
+
+- stack: pure_pursuit
+  profile: conservative
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: pure_pursuit
+  profile: balanced
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: pure_pursuit
+  profile: aggressive
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1

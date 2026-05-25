@@ -76,7 +76,11 @@ def generate_launch_description():
             package='autocar_nav',
             name='lap_timer',
             executable='lap_timer.py',
-            parameters=[lap_timer_parameters('stanley', LaunchConfiguration('use_sim_time', default='True'))],
+            parameters=[lap_timer_parameters(
+                'stanley',
+                LaunchConfiguration('use_sim_time', default='True'),
+                navconfig,
+            )],
         ),
     ])
 

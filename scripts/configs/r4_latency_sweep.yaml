@@ -1,0 +1,56 @@
+# R4 — Latency sweep (Stanley + racing line)
+#
+# Reproduces REPORT.md Section 5.5 / RESULTS.md R4.
+# Expect U-shaped lap time; best ~164 s near 300 ms; 1000 ms likely TIMEOUT.
+#
+#   python3 scripts/benchmark.py --config scripts/configs/r4_latency_sweep.yaml
+#
+# Wall-clock: ~18–24 min (6 launches × 3 laps)
+
+- stack: stanley
+  profile: default
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: stanley
+  profile: default
+  line: racing
+  latency_ms: 100
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: stanley
+  profile: default
+  line: racing
+  latency_ms: 200
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: stanley
+  profile: default
+  line: racing
+  latency_ms: 300
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: stanley
+  profile: default
+  line: racing
+  latency_ms: 500
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: stanley
+  profile: default
+  line: racing
+  latency_ms: 1000
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1

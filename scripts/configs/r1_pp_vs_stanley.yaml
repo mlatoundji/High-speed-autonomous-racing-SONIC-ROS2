@@ -1,0 +1,24 @@
+# R1 — Pure Pursuit vs Stanley (centerline, default tuning)
+#
+# Reproduces REPORT.md Section 5.2 / RESULTS.md R1.
+# Each run: lap_count=3, warmup_laps=1 (lap 2–3 in summary).
+#
+#   python3 scripts/benchmark.py --config scripts/configs/r1_pp_vs_stanley.yaml
+#
+# Wall-clock: ~12–15 min (2 launches × ~3 min/lap)
+
+- stack: stanley
+  profile: default
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1
+
+- stack: pure_pursuit
+  profile: default
+  line: centerline
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 3
+  warmup_laps: 1

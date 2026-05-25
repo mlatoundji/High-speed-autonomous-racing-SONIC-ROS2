@@ -47,11 +47,17 @@ class GlobalPathPlanner(Node):
             self.passed_threshold = float(self.get_parameter("passed_threshold").value)
             self.cg2frontaxle = float(self.get_parameter("centreofgravity_to_frontaxle").value)
 
-        except:
-            raise Exception("Missing ROS parameters. Check the configuration file.")
+        except ValueError:
+            raise Exception('Missing ROS parameters. Check the configuration file.')
 
-        # Get path to waypoints.csv
-        dir_path = os.path.join(get_package_share_directory('autocar_nav'), 'data', 'waypoints.csv')
+        self.declare_parameter('waypoints_file', 'waypoints.csv')
+        waypoints_filename = str(self.get_parameter('waypoints_file').value)
+        dir_path = os.path.join(
+            get_package_share_directory('autocar_racing_line'),
+            'data',
+            waypoints_filename,
+        )
+        self.get_logger().info(f'Loading waypoints from autocar_racing_line: {waypoints_filename}')
         df = pd.read_csv(dir_path)
 
         # Import waypoints.csv into class variables ax and ay

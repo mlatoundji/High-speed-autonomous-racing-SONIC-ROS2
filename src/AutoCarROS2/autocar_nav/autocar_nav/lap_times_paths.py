@@ -1,31 +1,28 @@
-"""Resolve lap-time CSV paths under results/.
+"""Resolve lap-time output paths under results/.
 
-Expected layout (relative to repo root):
+Layout (per run):
 
-    docs/
-        REPORT_BASELINE.md
-        REPORT_MPC.md              # optional, per-controller reports
-        REPORT_PURE_PURSUIT.md
     results/
-        lap_times_baseline.csv       # frozen reference lap (not written by lap_timer)
-        lap_times_stanley.csv        # stack=stanley  (lap_timer)
-        lap_times_mpc.csv            # stack=mpc
-        lap_times_pure_pursuit.csv
+        <stack>_<run_id>/
+            params.yaml      # run metadata + navigation ROS parameters
+            lap_times.csv    # one row per completed lap
 
-Live runs: lap_timer appends to results/lap_times_<stack>.csv for
-stack in KNOWN_STACKS. Filename pattern: lap_times_{stack}.csv
+run_id format: ``YYYY-MM-DDTHH-MM-SS`` (local time, no timezone).
 """
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 RESULTS_DIRNAME = 'results'
-BASELINE_NAME = 'lap_times_baseline.csv'
 REPORT_BASELINE_NAME = 'REPORT_BASELINE.md'
+
+RUN_LAP_TIMES_NAME = 'lap_times.csv'
+RUN_PARAMS_NAME = 'params.yaml'
 
 KNOWN_STACKS = frozenset({'stanley', 'mpc', 'pure_pursuit'})
 
-LAP_TIMES_CSV_FIELDS = (
+LAP_TIMES_LEGACY_FIELDS = (
     'session_id',
     'lap_number',
     'timestamp_iso',
@@ -35,34 +32,63 @@ LAP_TIMES_CSV_FIELDS = (
     'distance_m',
 )
 
+LAP_TIMES_EXTRA_FIELDS = (
+    'controller',
+    'profile',
+    'latency_ms',
+    'odom_noise_std',
+    'lateral_error_rms',
+    'lateral_error_max',
+    'steering_rate_max',
+    'offtrack_events',
+)
 
-def stack_lap_times_name(stack):
-    """Per-stack log filename: lap_times_<stack>.csv"""
-    return f'lap_times_{stack}.csv'
+LAP_TIMES_CSV_FIELDS = LAP_TIMES_LEGACY_FIELDS + LAP_TIMES_EXTRA_FIELDS
+
+
+def make_run_id(when=None):
+    """Return a filesystem-safe run identifier."""
+    dt = when or datetime.now()
+    return dt.strftime('%Y-%m-%dT%H-%M-%S')
+
+
+def run_directory_name(stack, run_id, line=None):
+    """Directory name: ``<stack>_<line>_<run_id>`` when line is not centerline."""
+    if line and line not in ('centerline', 'center'):
+        return f'{stack}_{line}_{run_id}'
+    return f'{stack}_{run_id}'
 
 
 def results_dir(root: Path) -> Path:
     return root / RESULTS_DIRNAME
 
 
-def baseline_csv_in_repo(root: Path) -> Path:
-    return results_dir(root) / BASELINE_NAME
+def run_dir_path(stack, run_id=None, results_root=None, line=None):
+    """Absolute path to ``results/<stack>_<run_id>/`` (or with line suffix)."""
+    base = Path(results_root) if results_root else resolve_lap_times_dir()
+    rid = run_id or make_run_id()
+    return base / run_directory_name(stack, rid, line=line), rid
 
 
-def stack_csv_in_repo(root: Path, stack: str) -> Path:
-    return results_dir(root) / stack_lap_times_name(stack)
+def run_lap_times_csv(run_dir: Path) -> Path:
+    return Path(run_dir) / RUN_LAP_TIMES_NAME
 
 
-def _repo_markers(root: Path):
-    return (root / 'docs' / REPORT_BASELINE_NAME, baseline_csv_in_repo(root))
+def run_params_yml(run_dir: Path) -> Path:
+    return Path(run_dir) / RUN_PARAMS_NAME
+
+
+def _repo_root_ok(root: Path) -> bool:
+    report = root / 'docs' / REPORT_BASELINE_NAME
+    return report.is_file() and results_dir(root).is_dir()
 
 
 def find_repo_root():
-    """Return repo root when docs/ + results/ match the expected layout."""
+    """Return repo root when docs/REPORT_BASELINE.md and results/ exist."""
     env_root = os.environ.get('AUTOCAR_REPO_ROOT')
     if env_root:
         root = Path(env_root).expanduser().resolve()
-        if all(m.is_file() for m in _repo_markers(root)):
+        if _repo_root_ok(root):
             return root
 
     results_env = os.environ.get('AUTOCAR_RESULTS_DIR')
@@ -71,19 +97,19 @@ def find_repo_root():
         if results.is_file():
             results = results.parent
         root = results.parent
-        if all(m.is_file() for m in _repo_markers(root)):
+        if _repo_root_ok(root):
             return root
 
     for start in (Path(__file__).resolve(), Path.cwd()):
         for parent in (start, *start.parents):
-            if all(m.is_file() for m in _repo_markers(parent)):
+            if _repo_root_ok(parent):
                 return parent
 
     try:
         from ament_index_python.packages import get_package_share_directory
         share = Path(get_package_share_directory('autocar_nav')).resolve()
         for parent in (share, *share.parents):
-            if all(m.is_file() for m in _repo_markers(parent)):
+            if _repo_root_ok(parent):
                 return parent
     except Exception:
         pass
@@ -92,7 +118,7 @@ def find_repo_root():
 
 
 def resolve_results_dir():
-    """Project results/ directory, or ~/.ros/results as fallback."""
+    """Project ``results/`` directory, or ``~/.ros/results`` as fallback."""
     root = find_repo_root()
     if root is not None:
         return root / RESULTS_DIRNAME
@@ -108,21 +134,171 @@ def resolve_results_dir():
 
 
 def resolve_lap_times_dir():
-    """results/ (created on demand)."""
+    """``results/`` (created on demand)."""
     lap_dir = resolve_results_dir()
     lap_dir.mkdir(parents=True, exist_ok=True)
     return lap_dir
 
 
-def lap_log_paths(stack='unknown', lap_times_csv=None):
-    """Return CSV path list under results/ and whether the repo was found."""
+def _yaml_available():
+    try:
+        import yaml  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _load_yaml(path):
+    import yaml
+    with Path(path).open(encoding='utf-8') as f:
+        return yaml.safe_load(f) or {}
+
+
+def _dump_yaml(path, data):
+    import yaml
+    with Path(path).open('w', encoding='utf-8') as f:
+        yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+
+
+def write_run_params(
+    run_dir,
+    stack,
+    run_id,
+    navconfig_path=None,
+    use_sim_time=None,
+    line=None,
+    profile=None,
+    latency_ms=None,
+    odom_noise_std=None,
+):
+    """Write ``params.yaml`` for a new run directory."""
+    run_dir = Path(run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    dest = run_params_yml(run_dir)
+
+    payload = {
+        'run': {
+            'stack': stack,
+            'run_id': run_id,
+            'started_at': datetime.now().isoformat(timespec='seconds'),
+        },
+    }
+    if use_sim_time is not None:
+        payload['run']['use_sim_time'] = bool(use_sim_time) if isinstance(
+            use_sim_time, bool) else str(use_sim_time)
+    if line is not None:
+        payload['run']['line'] = str(line)
+    if profile is not None:
+        payload['run']['profile'] = str(profile)
+    if latency_ms is not None:
+        payload['run']['latency_ms'] = int(latency_ms)
+    if odom_noise_std is not None:
+        payload['run']['odom_noise_std'] = float(odom_noise_std)
+
+    nav_path = None
+    if navconfig_path:
+        nav_path = Path(navconfig_path).expanduser().resolve()
+        payload['run']['navigation_params_source'] = str(nav_path)
+
+    if nav_path is not None and nav_path.is_file():
+        if _yaml_available():
+            payload['navigation'] = _load_yaml(nav_path)
+            _dump_yaml(dest, payload)
+            return
+        dest.write_text(nav_path.read_text(encoding='utf-8'), encoding='utf-8')
+        header = (
+            f'# run: stack={stack} run_id={run_id}\n'
+            f'# navigation_params_source: {nav_path}\n'
+        )
+        if use_sim_time is not None:
+            header += f'# use_sim_time: {use_sim_time}\n'
+        dest.write_text(header + dest.read_text(encoding='utf-8'), encoding='utf-8')
+        return
+
+    if _yaml_available():
+        _dump_yaml(dest, payload)
+    else:
+        dest.write_text(
+            f'run:\n  stack: {stack}\n  run_id: {run_id}\n',
+            encoding='utf-8',
+        )
+
+
+def init_lap_times_csv(csv_path):
+    """Create or migrate ``lap_times.csv`` to the 15-column schema."""
+    import csv
+    csv_path = Path(csv_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not csv_path.exists() or csv_path.stat().st_size == 0:
+        with csv_path.open('w', newline='', encoding='utf-8') as f:
+            csv.writer(f).writerow(LAP_TIMES_CSV_FIELDS)
+        return
+
+    with csv_path.open('r', newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        try:
+            header = next(reader)
+        except StopIteration:
+            header = []
+        rows = list(reader)
+
+    if header == list(LAP_TIMES_CSV_FIELDS):
+        return
+
+    if header == list(LAP_TIMES_LEGACY_FIELDS):
+        pad = [''] * len(LAP_TIMES_EXTRA_FIELDS)
+        with csv_path.open('w', newline='', encoding='utf-8') as f:
+            w = csv.writer(f)
+            w.writerow(LAP_TIMES_CSV_FIELDS)
+            for row in rows:
+                w.writerow(row + pad)
+        return
+
+
+def prepare_run_directory(
+    stack,
+    navconfig_path=None,
+    use_sim_time=None,
+    run_id=None,
+    line=None,
+    profile=None,
+    latency_ms=None,
+    odom_noise_std=None,
+):
+    """Create ``results/<stack>_<run_id>/`` with ``params.yaml`` and ``lap_times.csv``.
+
+    Returns:
+        (run_dir, run_id) as ``Path`` and ``str``.
+    """
+    if stack not in KNOWN_STACKS:
+        raise ValueError(
+            f'Unknown stack {stack!r}; expected one of: {sorted(KNOWN_STACKS)}')
+
+    run_dir, rid = run_dir_path(stack, run_id=run_id, line=line)
+    write_run_params(
+        run_dir,
+        stack,
+        rid,
+        navconfig_path,
+        use_sim_time=use_sim_time,
+        line=line,
+        profile=profile,
+        latency_ms=latency_ms,
+        odom_noise_std=odom_noise_std,
+    )
+    init_lap_times_csv(run_lap_times_csv(run_dir))
+    return run_dir, rid
+
+
+def lap_log_paths(stack='unknown', run_dir=None, lap_times_csv=None):
+    """Return lap CSV path list and whether the project repo was detected."""
     in_project_repo = find_repo_root() is not None
-    lap_dir = resolve_lap_times_dir()
 
     if lap_times_csv:
         return [Path(lap_times_csv).expanduser()], in_project_repo
 
-    if stack in KNOWN_STACKS:
-        return [lap_dir / stack_lap_times_name(stack)], in_project_repo
+    if run_dir:
+        return [run_lap_times_csv(Path(run_dir).expanduser())], in_project_repo
 
     return [], in_project_repo

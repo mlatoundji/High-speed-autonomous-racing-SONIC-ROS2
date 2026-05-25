@@ -9,33 +9,45 @@ local_planner:
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.0
-        avoid_velocity: 7.0
-        max_lateral_accel: 5.0
-        min_curvature: 0.015
-        curvature_lookahead: 120
-        curvature_smooth_window: 7
-        accel_rate: 4.0
-        decel_rate: 6.0
+        avoid_velocity: 8.0
+        max_lateral_accel: 5.5
+        min_curvature: 0.012
+        curvature_lookahead: 140
+        curvature_smooth_window: 5
+        accel_rate: 5.0
+        decel_rate: 7.0
+        path_resolution: 0.1
+        obstacle_check_horizon: 25.0
+        obstacle_blocked_fraction: 0.35
 
 global_planner:
     ros__parameters:
         update_frequency: 2.0
-        waypoints_ahead: 3
+        waypoints_ahead: 5
         waypoints_behind: 2
         passed_threshold: 0.25
         centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
+        waypoints_file: waypoints.csv
 
 path_tracker:
     ros__parameters:
         update_frequency: 50.0
         centreofgravity_to_frontaxle: 1.483
         wheelbase: 2.966
-        mpc_horizon: 15
-        closest_search_ahead: 100
-        q_ey: 120.0
-        q_epsi: 25.0
-        r_delta: 0.08
-        r_ddelta: 1.2
+        mpc_horizon: 18
+        closest_search_ahead: 120
+        closest_min_advance: 0.0
+        # Aligned with pure_pursuit: stronger tracking, less artificial slowing
+        q_ey: 200.0
+        q_epsi: 36.0
+        r_delta: 0.04
+        r_ddelta: 0.5
         steering_limits: 0.95
-        steering_rate_limit: 3.0
+        steering_rate_limit: 0.0
         velocity_gain: 1.0
+        cruise_velocity: 8.0
+        startup_ramp_s: 2.0
+        steer_smoothing: 0.0
+        lateral_soft: 4.0
+        heading_soft: 0.6

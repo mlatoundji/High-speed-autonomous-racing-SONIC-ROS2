@@ -54,13 +54,31 @@ Distance matches the centerline: lateral tracking is good. Lap time is limited m
 
 ## Reproduce
 
+From repo root (see [`docs/README.md`](README.md) for all stacks and batch commands).
+
+**Stanley, centerline** (this report):
+
 ```bash
-colcon build --packages-select autocar_nav launches
+colcon build --packages-select autocar_racing_line autocar_nav launches --symlink-install
 source install/setup.bash
-ros2 launch launches race_launch.py
+ros2 launch launches race_launch.py line:=centerline profile:=default latency_ms:=0 odom_noise_std:=0.0
+```
+
+**Stanley, racing line** (used in need_for_speed R3/R4):
+
+```bash
+ros2 launch launches race_launch.py line:=racing profile:=default latency_ms:=0 odom_noise_std:=0.0
+```
+
+**Batch** (R3 racing headline, R4 latency sweep):
+
+```bash
+pip install -r scripts/requirements.txt
+python3 scripts/benchmark.py --config scripts/configs/r3_racing_line.yaml
+python3 scripts/benchmark.py --config scripts/configs/r4_latency_sweep.yaml
 ```
 
 ## Data
 
-Frozen: `[../results/lap_times_baseline.csv](../results/lap_times_baseline.csv)`  
-Live Stanley logs: `[../results/lap_times_stanley.csv](../results/lap_times_stanley.csv)`
+Reference session: `[../results/baseline_2026-05-20T22-07-12/lap_times.csv](../results/baseline_2026-05-20T22-07-12/lap_times.csv)`  
+Live Stanley logs: `[../results/`](../results/) — `results/stanley_<run_id>/` per session
