@@ -1,6 +1,14 @@
+# =============================================================================
+# ROS 2 / colcon workspace
+# =============================================================================
 build/
 install/
 log/
+.colcon/
+
+# =============================================================================
+# Repo layout (Docker runtime; only AutoCarROS2 sources are versioned)
+# =============================================================================
 runtime/*
 shared/*
 !runtime/.gitkeep
@@ -10,7 +18,68 @@ src/*
 !src/AutoCarROS2/**
 !src/commands.md
 
-# Claude Code runtime data
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+.venv-*/
+venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# =============================================================================
+# OS / editor / IDE
+# =============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Cursor (keep project settings local)
+.cursor/
+
+# =============================================================================
+# Claude Code
+# =============================================================================
 .claude/scheduled_tasks.lock
 
-__pycache__
+# =============================================================================
+# Simulation & benchmark outputs (regenerate locally; see docs/README.md)
+# Allowlisted trees are report / snapshot references linked from docs/.
+# =============================================================================
+results/**
+!results/baseline_2026-05-20T22-07-12/**
+!results/benchmark_2026-05-23T16-28-02/**
+!results/pp_racing_line_2026-05-23/**
+!results/mpc_2026-05-25T16-46-36/**
+!results/mpc_racing_2026-05-25T16-56-47/**
+!results/pure_pursuit_2026-05-25T16-28-02/**
+!results/pure_pursuit_racing_2026-05-25T16-34-12/**
+!results/stanley_2026-05-25T13-55-37/**
+!results/stanley_racing_2026-05-25T13-48-10/**
+
+# Legacy run metadata (prefer params.yaml)
+results/**/params.yml
+
+# =============================================================================
+# Deprecated / local-only paths
+# =============================================================================
+/configs/
