@@ -291,6 +291,64 @@ Le circuit de course contient aussi des garde-corps physiques sur les bords
 intérieur et extérieur. Le noeud `control_manager` signale également une sortie
 de piste logique via `/autocar/collision` et `/autocar/control_status`.
 
+## Interface de contrôle desktop
+
+Le package `autocar_gui` fournit une fenêtre PySide6 minimaliste pour piloter
+la simulation et afficher le flux caméra arrière sans passer par RViz.
+
+### Prérequis
+
+```bash
+pip install -r src/AutoCarROS2/autocar_gui/requirements.txt
+colcon build --packages-select autocar_gui
+source install/setup.bash
+```
+
+### Lancement
+
+Terminal 1 — simulation :
+
+```bash
+ros2 launch launches race_launch.py control_mode:=semi gui:=true rviz:=true
+```
+
+Terminal 2 — panel desktop :
+
+```bash
+ros2 run autocar_gui control_panel.py
+```
+
+Variantes :
+
+```bash
+# Forcer le backend ROS (flux caméra + topics locaux)
+ros2 run autocar_gui control_panel.py --backend ros
+
+# Repli HTTP via l'API container (contrôle OK, pas de caméra)
+ros2 run autocar_gui control_panel.py --backend http --api-url http://localhost:8001
+
+# Via launch file
+ros2 launch launches control_panel_launch.py backend:=auto api_url:=http://localhost:8001
+```
+
+### Architecture topics
+
+| Direction | Topic | Type | Rôle |
+| --- | --- | --- | --- |
+| Entrée UI | `/autocar/third_person_camera/image_raw` | `sensor_msgs/Image` | Flux vidéo (ROS uniquement) |
+| Entrée UI | `/autocar/control_status` | `std_msgs/String` (JSON) | Mode, vitesse, collision, commande |
+| Entrée UI | `/autocar/state2D` | `autocar_msgs/State2D` | État véhicule (secours vitesse) |
+| Entrée UI | `/autocar/lateral_error` | `std_msgs/Float64` | Erreur latérale |
+| Sortie UI | `/autocar/manual_cmd_vel` | `geometry_msgs/Twist` | Commande manuelle (10 Hz) |
+| Sortie UI | `/autocar/control_mode` | `std_msgs/String` | Boutons manual / semi / auto |
+| Sortie UI | `/autocar/stop` | `std_msgs/Bool` | Arrêt latched |
+| Sortie UI | `/autocar/resume_auto` | `std_msgs/Bool` | Reprise autonomie |
+
+En mode HTTP, le panel interroge l'API container (`GET /api/control/status`,
+`POST /api/control/*`, `POST /api/command/manual`) documentée plus haut.
+Le flux caméra reste disponible uniquement via ROS (même domaine DDS que la
+simulation).
+
 ## Expériences Attendues
 
 Les comparaisons de performance seront organisées autour de trois profils de paramètres :

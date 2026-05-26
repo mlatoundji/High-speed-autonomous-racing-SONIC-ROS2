@@ -2,6 +2,8 @@ import os
 import signal
 import subprocess
 import time
+import json
+import re
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -81,6 +83,25 @@ def shell(command: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
         timeout=timeout,
         check=False,
     )
+
+
+def parse_control_status_echo(stdout: str) -> Optional[dict]:
+    """Extract JSON payload from `ros2 topic echo` output."""
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("data:"):
+            continue
+        payload = stripped.split(":", 1)[1].strip()
+        if payload.startswith("'") and payload.endswith("'"):
+            payload = payload[1:-1]
+        elif payload.startswith('"') and payload.endswith('"'):
+            payload = payload[1:-1]
+        return json.loads(payload)
+
+    match = re.search(r"data:\s*['\"]?(\{.*\})['\"]?", stdout, re.DOTALL)
+    if match:
+        return json.loads(match.group(1))
+    return None
 
 
 def simulation_status() -> dict:
@@ -283,7 +304,13 @@ def control_status() -> dict:
     result = shell("timeout 3 ros2 topic echo --once /autocar/control_status", timeout=5.0)
     if result.returncode not in (0, 124):
         raise HTTPException(status_code=500, detail=result.stderr or result.stdout)
-    return {"raw": result.stdout.strip()}
+    raw = result.stdout.strip()
+    status = None
+    try:
+        status = parse_control_status_echo(raw)
+    except json.JSONDecodeError:
+        status = None
+    return {"raw": raw, "status": status}
 
 
 @app.post("/api/navigation/goal")
