@@ -41,7 +41,7 @@ class PurePursuitTracker(Node):
 
         super().__init__('path_tracker')
 
-        self.tracker_pub = self.create_publisher(Twist, '/autocar/cmd_vel', 10)
+        self.tracker_pub = self.create_publisher(Twist, '/autocar/auto_cmd_vel', 10)
         self.lateral_ref_pub = self.create_publisher(PoseStamped, '/autocar/lateral_ref', 10)
         self.lateral_error_pub = self.create_publisher(Float64, '/autocar/lateral_error', 10)
 

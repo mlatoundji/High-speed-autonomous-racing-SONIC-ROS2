@@ -56,7 +56,7 @@
 
     <!-- Default ground_plane (light gray). Tinted warm by the sunset light.
          A custom colored plane at z=0 caused Z-fighting with the <road>
-         element, making the road flicker / disappear -- so we keep the
+         element, making the road flicker / disappear, so we keep the
          stock plane which is proven to render the road correctly. -->
     <include>
       <uri>model://ground_plane</uri>
@@ -119,6 +119,40 @@
             </ros>
             <output_type>sensor_msgs/LaserScan</output_type>
             <frame_name>hokuyo_link</frame_name>
+          </plugin>
+        </sensor>
+      </link>
+
+      <joint name="third_person_camera_joint" type="fixed">
+        <parent>base_link</parent>
+        <child>third_person_camera_link</child>
+      </joint>
+
+      <link name="third_person_camera_link">
+        <pose relative_to="base_link">0 -8 3.5 0 0.25 1.5708</pose>
+        <sensor name="third_person_camera" type="camera">
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+          <update_rate>30</update_rate>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image>
+              <width>1280</width>
+              <height>720</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>300</far>
+            </clip>
+          </camera>
+          <plugin name="third_person_camera_controller" filename="libgazebo_ros_camera.so">
+            <ros>
+              <namespace>autocar</namespace>
+              <remapping>image_raw:=third_person_camera/image_raw</remapping>
+              <remapping>camera_info:=third_person_camera/camera_info</remapping>
+            </ros>
+            <frame_name>third_person_camera_link</frame_name>
           </plugin>
         </sensor>
       </link>
@@ -1052,6 +1086,62 @@
         <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
           <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
       </link>
+    </model>
+
+    <model name="track_inner_guardrail">
+      <static>true</static>
+      <link name="seg_00"><pose>96.00 0.00 0.55 0 0 1.5708</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_01"><pose>92.73 24.85 0.55 0 0 1.8326</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_02"><pose>83.14 48.00 0.55 0 0 2.0944</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_03"><pose>67.88 67.88 0.55 0 0 2.3562</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_04"><pose>48.00 83.14 0.55 0 0 2.6180</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_05"><pose>24.85 92.73 0.55 0 0 2.8798</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_06"><pose>0.00 96.00 0.55 0 0 3.1416</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_07"><pose>-24.85 92.73 0.55 0 0 3.4034</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_08"><pose>-48.00 83.14 0.55 0 0 3.6652</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_09"><pose>-67.88 67.88 0.55 0 0 3.9270</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_10"><pose>-83.14 48.00 0.55 0 0 4.1888</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_11"><pose>-92.73 24.85 0.55 0 0 4.4506</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_12"><pose>-96.00 0.00 0.55 0 0 4.7124</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_13"><pose>-92.73 -24.85 0.55 0 0 4.9742</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_14"><pose>-83.14 -48.00 0.55 0 0 5.2360</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_15"><pose>-67.88 -67.88 0.55 0 0 5.4978</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_16"><pose>-48.00 -83.14 0.55 0 0 5.7596</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_17"><pose>-24.85 -92.73 0.55 0 0 6.0214</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_18"><pose>0.00 -96.00 0.55 0 0 6.2832</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_19"><pose>24.85 -92.73 0.55 0 0 6.5450</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_20"><pose>48.00 -83.14 0.55 0 0 6.8068</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_21"><pose>67.88 -67.88 0.55 0 0 7.0686</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_22"><pose>83.14 -48.00 0.55 0 0 7.3304</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_23"><pose>92.73 -24.85 0.55 0 0 7.5922</pose><collision name="col"><geometry><box><size>24.0 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>24.0 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+    </model>
+
+    <model name="track_outer_guardrail">
+      <static>true</static>
+      <link name="seg_00"><pose>112.00 0.00 0.55 0 0 1.5708</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_01"><pose>108.18 28.99 0.55 0 0 1.8326</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_02"><pose>96.99 56.00 0.55 0 0 2.0944</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_03"><pose>79.20 79.20 0.55 0 0 2.3562</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_04"><pose>56.00 96.99 0.55 0 0 2.6180</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_05"><pose>28.99 108.18 0.55 0 0 2.8798</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_06"><pose>0.00 112.00 0.55 0 0 3.1416</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_07"><pose>-28.99 108.18 0.55 0 0 3.4034</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_08"><pose>-56.00 96.99 0.55 0 0 3.6652</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_09"><pose>-79.20 79.20 0.55 0 0 3.9270</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_10"><pose>-96.99 56.00 0.55 0 0 4.1888</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_11"><pose>-108.18 28.99 0.55 0 0 4.4506</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_12"><pose>-112.00 0.00 0.55 0 0 4.7124</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_13"><pose>-108.18 -28.99 0.55 0 0 4.9742</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_14"><pose>-96.99 -56.00 0.55 0 0 5.2360</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_15"><pose>-79.20 -79.20 0.55 0 0 5.4978</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_16"><pose>-56.00 -96.99 0.55 0 0 5.7596</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_17"><pose>-28.99 -108.18 0.55 0 0 6.0214</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_18"><pose>0.00 -112.00 0.55 0 0 6.2832</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_19"><pose>28.99 -108.18 0.55 0 0 6.5450</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_20"><pose>56.00 -96.99 0.55 0 0 6.8068</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_21"><pose>79.20 -79.20 0.55 0 0 7.0686</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_22"><pose>96.99 -56.00 0.55 0 0 7.3304</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
+      <link name="seg_23"><pose>108.18 -28.99 0.55 0 0 7.5922</pose><collision name="col"><geometry><box><size>28.5 1.2 1.1</size></box></geometry></collision><visual name="vis"><geometry><box><size>28.5 1.2 1.1</size></box></geometry><material><ambient>0.12 0.12 0.12 1</ambient><diffuse>0.45 0.45 0.42 1</diffuse><specular>0.1 0.1 0.1 1</specular></material></visual></link>
     </model>
 
   </world>

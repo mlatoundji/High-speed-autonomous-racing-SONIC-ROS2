@@ -283,6 +283,32 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /autocar/lateral_ref
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Control Status
+      Namespaces:
+        autocar_status: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /autocar/status_markers
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Third Person Camera
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /autocar/third_person_camera/image_raw
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -326,26 +352,71 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 141.89944458007812
+      Distance: 18
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.370696544647217
-        Y: 6.9254841804504395
-        Z: 1.7547965049743652
+        X: 0
+        Y: 0
+        Z: 1.6
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.630398154258728
-      Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
-      Yaw: 3.9685769081115723
-    Saved: ~
+      Pitch: 0.45
+      Target Frame: base_link
+      Value: Orbit (follow vehicle)
+      Yaw: 3.14159
+    Saved:
+      - Class: rviz_default_plugins/Orbit
+        Distance: 18
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Focal Point:
+          X: 0
+          Y: 0
+          Z: 1.6
+        Focal Shape Fixed Size: true
+        Focal Shape Size: 0.05000000074505806
+        Invert Z Axis: false
+        Name: Follow Behind
+        Near Clip Distance: 0.009999999776482582
+        Pitch: 0.45
+        Target Frame: base_link
+        Value: Orbit (follow vehicle)
+        Yaw: 3.14159
+      - Class: rviz_default_plugins/TopDownOrtho
+        Name: Top Down
+        Scale: 180
+        Target Frame: base_link
+        Value: TopDownOrtho (track)
+      - Class: rviz_default_plugins/Orbit
+        Distance: 141.89944458007812
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Focal Point:
+          X: 2.370696544647217
+          Y: 6.9254841804504395
+          Z: 1.7547965049743652
+        Focal Shape Fixed Size: true
+        Focal Shape Size: 0.05000000074505806
+        Invert Z Axis: false
+        Name: Free Overview
+        Near Clip Distance: 0.009999999776482582
+        Pitch: 0.630398154258728
+        Target Frame: <Fixed Frame>
+        Value: Orbit (overview)
+        Yaw: 3.9685769081115723
 Window Geometry:
   Displays:
     collapsed: true

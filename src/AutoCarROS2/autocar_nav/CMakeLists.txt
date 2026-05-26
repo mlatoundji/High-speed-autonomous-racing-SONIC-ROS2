@@ -22,6 +22,7 @@ find_package(rclpy REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
@@ -40,6 +41,8 @@ install(PROGRAMS
   nodes/localplanner.py
   nodes/clickplanner.py
   nodes/tracker.py
+  nodes/control_manager.py
+  nodes/viz_status.py
   nodes/lap_timer.py
   nodes/latency_injector.py
   nodes/odom_noise_injector.py
