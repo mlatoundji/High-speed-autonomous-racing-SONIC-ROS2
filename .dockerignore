@@ -3,7 +3,7 @@
 build/
 install/
 log/
-ROS2_Foxy_Container/runtime/
-ROS2_Foxy_Container/shared/
+container/runtime/
+container/shared/
 **/__pycache__
 **/*.pyc

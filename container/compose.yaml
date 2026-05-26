@@ -2,7 +2,7 @@ services:
   autocar-ros2:
     build:
       context: ..
-      dockerfile: ROS2_Foxy_Container/docker/Dockerfile
+      dockerfile: container/docker/Dockerfile
     image: autocar/ros2-foxy-control:latest
     container_name: autocar-ros2-foxy
     environment:
