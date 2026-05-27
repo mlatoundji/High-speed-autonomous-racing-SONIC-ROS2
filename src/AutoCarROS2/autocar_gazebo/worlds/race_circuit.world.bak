@@ -703,6 +703,390 @@
          the 16m-wide race road. They are off-track so the planner does
          not need to avoid them; pure scenery for the wheat-field look. -->
 
+    <model name="haybale_in_00">
+      <static>true</static><pose>92.00 0.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_00">
+      <static>true</static><pose>114.00 0.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_01">
+      <static>true</static><pose>88.87 23.81 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_01">
+      <static>true</static><pose>110.12 29.51 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_02">
+      <static>true</static><pose>79.67 46.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_02">
+      <static>true</static><pose>98.73 57.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_03">
+      <static>true</static><pose>65.05 65.05 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_03">
+      <static>true</static><pose>80.61 80.61 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_04">
+      <static>true</static><pose>46.00 79.67 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_04">
+      <static>true</static><pose>57.00 98.73 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_05">
+      <static>true</static><pose>23.81 88.87 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_05">
+      <static>true</static><pose>29.51 110.12 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_06">
+      <static>true</static><pose>0.00 92.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_06">
+      <static>true</static><pose>0.00 114.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_07">
+      <static>true</static><pose>-23.81 88.87 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_07">
+      <static>true</static><pose>-29.51 110.12 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_08">
+      <static>true</static><pose>-46.00 79.67 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_08">
+      <static>true</static><pose>-57.00 98.73 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_09">
+      <static>true</static><pose>-65.05 65.05 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_09">
+      <static>true</static><pose>-80.61 80.61 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_10">
+      <static>true</static><pose>-79.67 46.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_10">
+      <static>true</static><pose>-98.73 57.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_11">
+      <static>true</static><pose>-88.87 23.81 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_11">
+      <static>true</static><pose>-110.12 29.51 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_12">
+      <static>true</static><pose>-92.00 0.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_12">
+      <static>true</static><pose>-114.00 0.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_13">
+      <static>true</static><pose>-88.87 -23.81 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_13">
+      <static>true</static><pose>-110.12 -29.51 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_14">
+      <static>true</static><pose>-79.67 -46.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_14">
+      <static>true</static><pose>-98.73 -57.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_15">
+      <static>true</static><pose>-65.05 -65.05 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_15">
+      <static>true</static><pose>-80.61 -80.61 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_16">
+      <static>true</static><pose>-46.00 -79.67 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_16">
+      <static>true</static><pose>-57.00 -98.73 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_17">
+      <static>true</static><pose>-23.81 -88.87 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_17">
+      <static>true</static><pose>-29.51 -110.12 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_18">
+      <static>true</static><pose>-0.00 -92.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_18">
+      <static>true</static><pose>-0.00 -114.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_19">
+      <static>true</static><pose>23.81 -88.87 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_19">
+      <static>true</static><pose>29.51 -110.12 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_20">
+      <static>true</static><pose>46.00 -79.67 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_20">
+      <static>true</static><pose>57.00 -98.73 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_21">
+      <static>true</static><pose>65.05 -65.05 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_21">
+      <static>true</static><pose>80.61 -80.61 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_22">
+      <static>true</static><pose>79.67 -46.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_22">
+      <static>true</static><pose>98.73 -57.00 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_in_23">
+      <static>true</static><pose>88.87 -23.81 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
+    <model name="haybale_out_23">
+      <static>true</static><pose>110.12 -29.51 0.55 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry></collision>
+        <visual name="vis"><geometry><cylinder><radius>0.55</radius><length>1.1</length></cylinder></geometry>
+          <material><ambient>0.45 0.35 0.12 1</ambient><diffuse>0.78 0.62 0.25 1</diffuse><specular>0.1 0.1 0.05 1</specular></material></visual>
+      </link>
+    </model>
 
     <model name="track_inner_guardrail">
       <static>true</static>
