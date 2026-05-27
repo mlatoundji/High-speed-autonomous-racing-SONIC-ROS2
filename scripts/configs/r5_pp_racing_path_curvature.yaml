@@ -1,0 +1,280 @@
+# R5 — Pure Pursuit + racing line: curvature pipeline + global horizon + steering filter
+#
+# Based on r3_pp_racing_optional.yaml. Targets the local planner's curvature-based
+# speed shaping and global waypoint window — high leverage when the line is not centerline.
+#
+#   python3 scripts/benchmark.py --config scripts/configs/r5_pp_racing_path_curvature.yaml
+#
+# Wall-clock: order-of-magnitude ~30–40 min × N runs (3 laps + 1 warmup per launch)
+#
+# Parameter legend: values with trailing ``# TUNED …`` differ from ``r5_pc_baseline`` in this file.
+# All other keys match that baseline.
+
+- stack: pure_pursuit
+  profile: r5_pc_baseline
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 2
+  warmup_laps: 1
+  navigation:
+    # Baseline: full r3_pp_racing_optional reference; no TUNED keys in this profile.
+    localisation:
+      ros__parameters:
+        update_frequency: 50.0
+    local_planner:
+      ros__parameters:
+        update_frequency: 10.0
+        car_width: 2.0
+        centreofgravity_to_frontaxle: 1.483
+        frame_id: "base_link"
+        cruise_velocity: 8.0
+        avoid_velocity: 8.0
+        max_lateral_accel: 5.5
+        min_curvature: 0.012
+        curvature_lookahead: 140
+        curvature_smooth_window: 5
+        accel_rate: 5.0
+        decel_rate: 7.0
+    global_planner:
+      ros__parameters:
+        update_frequency: 2.0
+        waypoints_ahead: 5
+        waypoints_behind: 2
+        passed_threshold: 0.25
+        centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
+        waypoints_file: waypoints.csv
+    path_tracker:
+      ros__parameters:
+        update_frequency: 50.0
+        centreofgravity_to_frontaxle: 1.483
+        centreofgravity_to_rearaxle: 1.483
+        wheelbase: 2.966
+        lookahead_gain: 0.4
+        lookahead_min: 1.5
+        lookahead_max: 6.0
+        closest_search_ahead: 120
+        steering_limits: 0.95
+        steering_rate_limit: 0.0
+        steer_smoothing: 1.0
+        velocity_gain: 1.0
+        startup_ramp_s: 2.0
+        lateral_soft: 4.0
+        heading_soft: 0.6
+
+- stack: pure_pursuit
+  profile: r5_pc_early_brake
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 2
+  warmup_laps: 1
+  navigation:
+    # Deltas vs r5_pc_baseline: local_planner min_curvature, curvature_lookahead only.
+    # --- frozen (same as baseline): localisation, global_planner, path_tracker ---
+    localisation:
+      ros__parameters:
+        update_frequency: 50.0
+    local_planner:
+      ros__parameters:
+        update_frequency: 10.0
+        car_width: 2.0
+        centreofgravity_to_frontaxle: 1.483
+        frame_id: "base_link"
+        cruise_velocity: 8.0
+        avoid_velocity: 8.0
+        max_lateral_accel: 5.5
+        min_curvature: 0.016  # TUNED (baseline 0.012); treat gentle bends as tighter → earlier slowdown
+        curvature_lookahead: 115  # TUNED (baseline 140); peek curvature sooner along path
+        curvature_smooth_window: 5
+        accel_rate: 5.0
+        decel_rate: 7.0
+    global_planner:
+      ros__parameters:
+        update_frequency: 2.0
+        waypoints_ahead: 5
+        waypoints_behind: 2
+        passed_threshold: 0.25
+        centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
+        waypoints_file: waypoints.csv
+    path_tracker:
+      ros__parameters:
+        update_frequency: 50.0
+        centreofgravity_to_frontaxle: 1.483
+        centreofgravity_to_rearaxle: 1.483
+        wheelbase: 2.966
+        lookahead_gain: 0.4
+        lookahead_min: 1.5
+        lookahead_max: 6.0
+        closest_search_ahead: 120
+        steering_limits: 0.95
+        steering_rate_limit: 0.0
+        steer_smoothing: 1.0
+        velocity_gain: 1.0
+        startup_ramp_s: 2.0
+        lateral_soft: 4.0
+        heading_soft: 0.6
+
+- stack: pure_pursuit
+  profile: r5_pc_late_commit
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 2
+  warmup_laps: 1
+  navigation:
+    # Deltas vs r5_pc_baseline: local_planner min_curvature, curvature_lookahead only.
+    # --- frozen (same as baseline): localisation, global_planner, path_tracker ---
+    localisation:
+      ros__parameters:
+        update_frequency: 50.0
+    local_planner:
+      ros__parameters:
+        update_frequency: 10.0
+        car_width: 2.0
+        centreofgravity_to_frontaxle: 1.483
+        frame_id: "base_link"
+        cruise_velocity: 8.0
+        avoid_velocity: 8.0
+        max_lateral_accel: 5.5
+        min_curvature: 0.009  # TUNED (baseline 0.012); carry speed longer in bends
+        curvature_lookahead: 165  # TUNED (baseline 140); curvature response delayed along path
+        curvature_smooth_window: 5
+        accel_rate: 5.0
+        decel_rate: 7.0
+    global_planner:
+      ros__parameters:
+        update_frequency: 2.0
+        waypoints_ahead: 5
+        waypoints_behind: 2
+        passed_threshold: 0.25
+        centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
+        waypoints_file: waypoints.csv
+    path_tracker:
+      ros__parameters:
+        update_frequency: 50.0
+        centreofgravity_to_frontaxle: 1.483
+        centreofgravity_to_rearaxle: 1.483
+        wheelbase: 2.966
+        lookahead_gain: 0.4
+        lookahead_min: 1.5
+        lookahead_max: 6.0
+        closest_search_ahead: 120
+        steering_limits: 0.95
+        steering_rate_limit: 0.0
+        steer_smoothing: 1.0
+        velocity_gain: 1.0
+        startup_ramp_s: 2.0
+        lateral_soft: 4.0
+        heading_soft: 0.6
+
+- stack: pure_pursuit
+  profile: r5_pc_smooth_kappa_long_wp
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 2
+  warmup_laps: 1
+  navigation:
+    # Deltas vs r5_pc_baseline: local_planner curvature_smooth_window; global_planner waypoints_ahead, waypoint_search_ahead.
+    # --- frozen: localisation, path_tracker, and every key below unless it has a # TUNED comment ---
+    localisation:
+      ros__parameters:
+        update_frequency: 50.0
+    local_planner:
+      ros__parameters:
+        update_frequency: 10.0
+        car_width: 2.0
+        centreofgravity_to_frontaxle: 1.483
+        frame_id: "base_link"
+        cruise_velocity: 8.0
+        avoid_velocity: 8.0
+        max_lateral_accel: 5.5
+        min_curvature: 0.012
+        curvature_lookahead: 140
+        curvature_smooth_window: 9  # TUNED (baseline 5); smoother κ → less speed jitter
+        accel_rate: 5.0
+        decel_rate: 7.0
+    global_planner:
+      ros__parameters:
+        update_frequency: 2.0
+        waypoints_ahead: 7  # TUNED (baseline 5)
+        waypoints_behind: 2
+        passed_threshold: 0.25
+        centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 42  # TUNED (baseline 30)
+        waypoints_file: waypoints.csv
+    path_tracker:
+      ros__parameters:
+        update_frequency: 50.0
+        centreofgravity_to_frontaxle: 1.483
+        centreofgravity_to_rearaxle: 1.483
+        wheelbase: 2.966
+        lookahead_gain: 0.4
+        lookahead_min: 1.5
+        lookahead_max: 6.0
+        closest_search_ahead: 120
+        steering_limits: 0.95
+        steering_rate_limit: 0.0
+        steer_smoothing: 1.0
+        velocity_gain: 1.0
+        startup_ramp_s: 2.0
+        lateral_soft: 4.0
+        heading_soft: 0.6
+
+- stack: pure_pursuit
+  profile: r5_pc_steer_damped
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 2
+  warmup_laps: 1
+  navigation:
+    # Deltas vs r5_pc_baseline: path_tracker steering_limits, steer_smoothing only.
+    # --- frozen (same as baseline): localisation, local_planner, global_planner ---
+    localisation:
+      ros__parameters:
+        update_frequency: 50.0
+    local_planner:
+      ros__parameters:
+        update_frequency: 10.0
+        car_width: 2.0
+        centreofgravity_to_frontaxle: 1.483
+        frame_id: "base_link"
+        cruise_velocity: 8.0
+        avoid_velocity: 8.0
+        max_lateral_accel: 5.5
+        min_curvature: 0.012
+        curvature_lookahead: 140
+        curvature_smooth_window: 5
+        accel_rate: 5.0
+        decel_rate: 7.0
+    global_planner:
+      ros__parameters:
+        update_frequency: 2.0
+        waypoints_ahead: 5
+        waypoints_behind: 2
+        passed_threshold: 0.25
+        centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
+        waypoints_file: waypoints.csv
+    path_tracker:
+      ros__parameters:
+        update_frequency: 50.0
+        centreofgravity_to_frontaxle: 1.483
+        centreofgravity_to_rearaxle: 1.483
+        wheelbase: 2.966
+        lookahead_gain: 0.4
+        lookahead_min: 1.5
+        lookahead_max: 6.0
+        closest_search_ahead: 120
+        steering_limits: 0.92  # TUNED (baseline 0.95)
+        steering_rate_limit: 0.0
+        steer_smoothing: 0.82  # TUNED (baseline 1.0); damp steering oscillation vs racing line
+        velocity_gain: 1.0
+        startup_ramp_s: 2.0
+        lateral_soft: 4.0
+        heading_soft: 0.6
