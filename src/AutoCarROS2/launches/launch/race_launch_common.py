@@ -1,6 +1,11 @@
 """Shared helpers for race stack launch files (centerline / racing line)."""
 
-from launch.actions import DeclareLaunchArgument
+import os
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, SetEnvironmentVariable
+from launch.conditions import IfCondition
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch.substitutions import LaunchConfiguration
@@ -36,6 +41,121 @@ def experiment_launch_arguments():
     ]
 
 
+def race_launch_arguments(default_world):
+    """Common launch args for race simulations."""
+    return [
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description='Use simulation (Gazebo) clock if true.',
+        ),
+        DeclareLaunchArgument(
+            'gui',
+            default_value='true',
+            description='Launch Gazebo client if true.',
+        ),
+        DeclareLaunchArgument(
+            'rviz',
+            default_value='true',
+            description='Launch RViz if true.',
+        ),
+        DeclareLaunchArgument(
+            'world',
+            default_value=default_world,
+            description='Gazebo world file to launch.',
+        ),
+        DeclareLaunchArgument(
+            'line',
+            default_value='centerline',
+            description='Waypoint track: centerline or racing.',
+        ),
+        DeclareLaunchArgument(
+            'control_mode',
+            default_value='auto',
+            description='Initial control mode: manual, semi, or auto.',
+        ),
+        DeclareLaunchArgument(
+            'use_control_manager',
+            default_value='false',
+            description=(
+                'If true, start control_manager (auto_cmd_vel -> cmd_vel, rate limits, '
+                'manual/semi). If false, remap path_tracker auto_cmd_vel to cmd_vel directly.'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'camera_mode',
+            default_value='follow',
+            description='Preferred camera mode: free, top, or follow.',
+        ),
+        *experiment_launch_arguments(),
+    ]
+
+
+def simulation_nodes(default_world):
+    """Return Gazebo, robot_state_publisher and RViz actions."""
+    descpkg = 'autocar_description'
+    rviz = os.path.join(
+        get_package_share_directory(descpkg), 'rviz', 'view.rviz')
+    urdf = os.path.join(
+        get_package_share_directory(descpkg), 'urdf', 'autocar.xacro')
+
+    use_sim_time = LaunchConfiguration('use_sim_time')
+
+    return [
+        SetEnvironmentVariable(
+            'RCUTILS_CONSOLE_OUTPUT_FORMAT', '[{severity}]: {message}'),
+        SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '1'),
+        SetEnvironmentVariable('QT_X11_NO_MITSHM', '1'),
+
+        ExecuteProcess(
+            cmd=[
+                'gzserver',
+                '--verbose',
+                LaunchConfiguration('world', default=default_world),
+                '-s',
+                'libgazebo_ros_init.so',
+                '-s',
+                'libgazebo_ros_factory.so',
+            ],
+        ),
+        ExecuteProcess(cmd=['gzclient'], condition=IfCondition(LaunchConfiguration('gui'))),
+
+        Node(
+            package='robot_state_publisher',
+            name='robot_state_publisher',
+            executable='robot_state_publisher',
+            output={'both': 'log'},
+            parameters=[{'use_sim_time': use_sim_time}],
+            arguments=[urdf],
+        ),
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz],
+            parameters=[{'use_sim_time': use_sim_time}],
+            output={'both': 'log'},
+            condition=IfCondition(LaunchConfiguration('rviz')),
+        ),
+    ]
+
+
+def race_launch_description(navpkg, stack, navconfig, world_name='race_circuit.world'):
+    """Build a full race launch description for one navigation stack."""
+    gzpkg = 'autocar_gazebo'
+    default_world = os.path.join(
+        get_package_share_directory(gzpkg), 'worlds', world_name)
+
+    def _nav_setup(context, *args, **kwargs):
+        return navigation_nodes(context, navpkg, stack, navconfig)
+
+    return LaunchDescription([
+        *race_launch_arguments(default_world),
+        *simulation_nodes(default_world),
+        OpaqueFunction(function=_nav_setup),
+    ])
+
+
 def resolve_waypoints_file(line: str) -> str:
     if line not in WAYPOINTS_FILES:
         raise RuntimeError(
@@ -51,6 +171,9 @@ def navigation_nodes(context, navpkg, stack, navconfig):
     profile = LaunchConfiguration('profile').perform(context)
     latency_ms = int(LaunchConfiguration('latency_ms').perform(context))
     odom_noise_std = float(LaunchConfiguration('odom_noise_std').perform(context))
+    initial_mode = LaunchConfiguration('control_mode').perform(context)
+    use_control_manager = LaunchConfiguration('use_control_manager').perform(
+        context).strip().lower() in ('true', '1', 'yes')
     mappkg = 'autocar_map'
 
     planner_params = [
@@ -60,6 +183,11 @@ def navigation_nodes(context, navpkg, stack, navconfig):
     ]
 
     injector_params = {'use_sim_time': use_sim_time}
+
+    tracker_remappings = (
+        [] if use_control_manager
+        else [('/autocar/auto_cmd_vel', '/autocar/cmd_vel')]
+    )
 
     return [
         Node(
@@ -94,8 +222,24 @@ def navigation_nodes(context, navpkg, stack, navconfig):
             parameters=[{'use_sim_time': use_sim_time}],
         ),
         Node(
+            package='autocar_nav', name='control_manager',
+            executable='control_manager.py',
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'initial_mode': initial_mode,
+            }],
+            condition=IfCondition(LaunchConfiguration('use_control_manager')),
+        ),
+        Node(
             package=navpkg, name='path_tracker', executable='tracker.py',
             parameters=[navconfig, {'use_sim_time': use_sim_time}],
+            remappings=tracker_remappings,
+        ),
+        Node(
+            package='autocar_nav', name='viz_status',
+            executable='viz_status.py',
+            parameters=[{'use_sim_time': use_sim_time}],
+            condition=IfCondition(LaunchConfiguration('use_control_manager')),
         ),
         Node(
             package='autocar_nav',

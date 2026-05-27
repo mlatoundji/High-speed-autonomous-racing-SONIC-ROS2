@@ -2,7 +2,7 @@ services:
   autocar-ros2:
     build:
       context: ..
-      dockerfile: ROS2_Foxy_Container/docker/Dockerfile
+      dockerfile: container/docker/Dockerfile
     image: autocar/ros2-foxy-control:latest
     container_name: autocar-ros2-foxy
     environment:
@@ -10,6 +10,7 @@ services:
       VNC_RESOLUTION: "1280x800"
       LIBGL_ALWAYS_SOFTWARE: "1"
       AUTOCAR_REPO_ROOT: "/workspace/autocar"
+      QT_X11_NO_MITSHM: "1"
     ports:
       - "6080:6080"
       - "8001:8001"

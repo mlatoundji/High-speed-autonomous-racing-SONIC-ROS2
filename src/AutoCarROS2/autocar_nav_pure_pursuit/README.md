@@ -16,7 +16,7 @@ Measured performance (2026-05-25, Gazebo `race_circuit.world`): **~108 s** cente
 | Library code | All in one node class | `pure_pursuit.py` helpers + `nodes/tracker.py` |
 | Waypoints | `autocar_nav/data/*.csv` | `autocar_racing_line/data/` (`line:=centerline\|racing`) |
 
-Topic contract is unchanged: `/autocar/state2D`, `/autocar/path`, `/autocar/target_velocity` in; `/autocar/cmd_vel`, `/autocar/lateral_error`, `/autocar/lateral_ref` out. `lap_timer` and cross-stack CSV columns remain comparable to Stanley.
+Topic contract is unchanged for planning inputs: `/autocar/state2D`, `/autocar/path`, `/autocar/target_velocity` in. The tracker now publishes autonomous commands on `/autocar/auto_cmd_vel`; `autocar_nav/control_manager.py` arbitrates manual/semi/auto modes and is the only node publishing `/autocar/cmd_vel`. `/autocar/lateral_error` and `/autocar/lateral_ref` remain comparable to Stanley.
 
 ---
 

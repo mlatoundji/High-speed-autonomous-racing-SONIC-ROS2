@@ -7,6 +7,7 @@ export AUTOCAR_WORKSPACE="${AUTOCAR_WORKSPACE:-/workspace}"
 export AUTOCAR_SHARED_DIR="${AUTOCAR_SHARED_DIR:-/workspace/shared}"
 export AUTOCAR_LOG_DIR="${AUTOCAR_LOG_DIR:-/workspace/runtime/logs}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
+export QT_X11_NO_MITSHM="${QT_X11_NO_MITSHM:-1}"
 
 mkdir -p "${AUTOCAR_SHARED_DIR}" "${AUTOCAR_LOG_DIR}" "${XDG_RUNTIME_DIR}"
 chmod 700 "${XDG_RUNTIME_DIR}"
