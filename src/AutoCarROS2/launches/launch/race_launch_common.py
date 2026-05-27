@@ -75,6 +75,14 @@ def race_launch_arguments(default_world):
             description='Initial control mode: manual, semi, or auto.',
         ),
         DeclareLaunchArgument(
+            'use_control_manager',
+            default_value='false',
+            description=(
+                'If true, start control_manager (auto_cmd_vel -> cmd_vel, rate limits, '
+                'manual/semi). If false, remap path_tracker auto_cmd_vel to cmd_vel directly.'
+            ),
+        ),
+        DeclareLaunchArgument(
             'camera_mode',
             default_value='follow',
             description='Preferred camera mode: free, top, or follow.',
@@ -164,6 +172,8 @@ def navigation_nodes(context, navpkg, stack, navconfig):
     latency_ms = int(LaunchConfiguration('latency_ms').perform(context))
     odom_noise_std = float(LaunchConfiguration('odom_noise_std').perform(context))
     initial_mode = LaunchConfiguration('control_mode').perform(context)
+    use_control_manager = LaunchConfiguration('use_control_manager').perform(
+        context).strip().lower() in ('true', '1', 'yes')
     mappkg = 'autocar_map'
 
     planner_params = [
@@ -173,6 +183,11 @@ def navigation_nodes(context, navpkg, stack, navconfig):
     ]
 
     injector_params = {'use_sim_time': use_sim_time}
+
+    tracker_remappings = (
+        [] if use_control_manager
+        else [('/autocar/auto_cmd_vel', '/autocar/cmd_vel')]
+    )
 
     return [
         Node(
@@ -213,15 +228,18 @@ def navigation_nodes(context, navpkg, stack, navconfig):
                 'use_sim_time': use_sim_time,
                 'initial_mode': initial_mode,
             }],
+            condition=IfCondition(LaunchConfiguration('use_control_manager')),
         ),
         Node(
             package=navpkg, name='path_tracker', executable='tracker.py',
             parameters=[navconfig, {'use_sim_time': use_sim_time}],
+            remappings=tracker_remappings,
         ),
         Node(
             package='autocar_nav', name='viz_status',
             executable='viz_status.py',
             parameters=[{'use_sim_time': use_sim_time}],
+            condition=IfCondition(LaunchConfiguration('use_control_manager')),
         ),
         Node(
             package='autocar_nav',
