@@ -77,6 +77,19 @@ def generate_launch_description():
                 '(empty = package share autocar_nav_pure_pursuit/config/navigation_params.yaml).'
             ),
         ),
+        DeclareLaunchArgument(
+            'control_mode',
+            default_value='auto',
+            description='Initial control mode: manual, semi, or auto.',
+        ),
+        DeclareLaunchArgument(
+            'use_control_manager',
+            default_value='false',
+            description=(
+                'If true, start control_manager (auto_cmd_vel -> cmd_vel, rate limits, '
+                'manual/semi). If false, remap path_tracker auto_cmd_vel to cmd_vel directly.'
+            ),
+        ),
         *experiment_launch_arguments(),
 
         Node(

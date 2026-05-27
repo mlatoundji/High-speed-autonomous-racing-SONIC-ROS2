@@ -5,7 +5,7 @@
 #
 #   python3 scripts/benchmark.py --config scripts/configs/r5_pp_racing_lookahead.yaml
 #
-# Wall-clock: order-of-magnitude ~30–40 min × N runs (3 laps + 1 warmup per launch; same as R1 convention)
+# Wall-clock: order-of-magnitude ~30–40 min × N runs (2 laps + 1 warmup per launch; same as R1 convention)
 #
 # Parameter legend: values with trailing ``# TUNED …`` differ from ``r5_ld_baseline`` in this file.
 # All other keys match that baseline (same as r3_pp_racing_optional).
