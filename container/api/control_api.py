@@ -2,6 +2,8 @@ import os
 import signal
 import subprocess
 import time
+import json
+import re
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -28,11 +30,14 @@ last_start_request: Optional["StartSimulationRequest"] = None
 
 
 class StartSimulationRequest(BaseModel):
-    mode: Literal["default", "click", "gazebo"] = Field(
+    mode: Literal["default", "click", "gazebo", "race", "race_mpc", "race_pure_pursuit"] = Field(
         "default",
-        description="default: pipeline autonome, click: goal via /goal_pose, gazebo: Gazebo seul pour commande manuelle",
+        description="default/click: legacy demos, gazebo: Gazebo seul, race*: stacks interactifs de course",
     )
-    headless: bool = Field(True, description="Only used by mode=gazebo. true launches gzserver, false launches gazebo GUI.")
+    headless: bool = Field(False, description="Only used by mode=gazebo. false launches Gazebo GUI, true launches gzserver only.")
+    control_mode: Literal["manual", "semi", "auto"] = Field("auto", description="Initial mode for race* launches.")
+    gui: bool = Field(True, description="Launch Gazebo GUI for race* launches.")
+    rviz: bool = Field(True, description="Launch RViz for race* launches.")
 
 
 class ManualCommandRequest(BaseModel):
@@ -40,6 +45,10 @@ class ManualCommandRequest(BaseModel):
     angular_z: float = 0.0
     duration_sec: float = Field(0.0, ge=0.0, le=60.0)
     rate_hz: float = Field(10.0, gt=0.0, le=50.0)
+
+
+class ControlModeRequest(BaseModel):
+    mode: Literal["manual", "semi", "auto"]
 
 
 class GoalRequest(BaseModel):
@@ -76,6 +85,25 @@ def shell(command: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
     )
 
 
+def parse_control_status_echo(stdout: str) -> Optional[dict]:
+    """Extract JSON payload from `ros2 topic echo` output."""
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("data:"):
+            continue
+        payload = stripped.split(":", 1)[1].strip()
+        if payload.startswith("'") and payload.endswith("'"):
+            payload = payload[1:-1]
+        elif payload.startswith('"') and payload.endswith('"'):
+            payload = payload[1:-1]
+        return json.loads(payload)
+
+    match = re.search(r"data:\s*['\"]?(\{.*\})['\"]?", stdout, re.DOTALL)
+    if match:
+        return json.loads(match.group(1))
+    return None
+
+
 def simulation_status() -> dict:
     if simulation_process is None:
         return {"running": False, "pid": None, "returncode": None}
@@ -106,6 +134,19 @@ def launch_command(request: StartSimulationRequest) -> str:
 
     if request.mode == "click":
         return "ros2 launch launches click_launch.py"
+
+    if request.mode in ("race", "race_mpc", "race_pure_pursuit"):
+        launch_file = {
+            "race": "race_launch.py",
+            "race_mpc": "race_mpc_launch.py",
+            "race_pure_pursuit": "race_pure_pursuit_launch.py",
+        }[request.mode]
+        return (
+            f"ros2 launch launches {launch_file} "
+            f"control_mode:={request.control_mode} "
+            f"gui:={str(request.gui).lower()} "
+            f"rviz:={str(request.rviz).lower()}"
+        )
 
     if request.headless:
         return (
@@ -174,7 +215,13 @@ def start_simulation(request: StartSimulationRequest) -> dict:
         )
 
     last_start_request = request
-    return {"started": True, "pid": simulation_process.pid, "mode": request.mode, "log_file": str(log_file)}
+    return {
+        "started": True,
+        "pid": simulation_process.pid,
+        "mode": request.mode,
+        "headless": request.headless if request.mode == "gazebo" else None,
+        "log_file": str(log_file),
+    }
 
 
 @app.post("/api/sim/stop")
@@ -203,19 +250,67 @@ def manual_command(request: ManualCommandRequest) -> dict:
 
     if request.duration_sec > 0:
         command = (
-            "timeout %.3f ros2 topic pub -r %.3f /autocar/cmd_vel geometry_msgs/msg/Twist '%s'"
+            "timeout %.3f ros2 topic pub -r %.3f /autocar/manual_cmd_vel geometry_msgs/msg/Twist '%s'"
             % (request.duration_sec, request.rate_hz, twist)
         )
         timeout = request.duration_sec + 3.0
     else:
-        command = "ros2 topic pub --once /autocar/cmd_vel geometry_msgs/msg/Twist '%s'" % twist
+        command = "ros2 topic pub --once /autocar/manual_cmd_vel geometry_msgs/msg/Twist '%s'" % twist
         timeout = 5.0
 
     result = shell(command, timeout=timeout)
     if result.returncode not in (0, 124):
         raise HTTPException(status_code=500, detail=result.stderr or result.stdout)
 
-    return {"published": True, "topic": "/autocar/cmd_vel"}
+    return {"published": True, "topic": "/autocar/manual_cmd_vel"}
+
+
+@app.post("/api/control/mode")
+def set_control_mode(request: ControlModeRequest) -> dict:
+    result = shell(
+        "ros2 topic pub --once /autocar/control_mode std_msgs/msg/String \"{data: '%s'}\""
+        % request.mode,
+        timeout=5.0,
+    )
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr or result.stdout)
+    return {"published": True, "topic": "/autocar/control_mode", "mode": request.mode}
+
+
+@app.post("/api/control/stop")
+def stop_vehicle() -> dict:
+    result = shell(
+        "ros2 topic pub --once /autocar/stop std_msgs/msg/Bool '{data: true}'",
+        timeout=5.0,
+    )
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr or result.stdout)
+    return {"stopped": True}
+
+
+@app.post("/api/control/resume")
+def resume_vehicle() -> dict:
+    result = shell(
+        "ros2 topic pub --once /autocar/resume_auto std_msgs/msg/Bool '{data: true}'",
+        timeout=5.0,
+    )
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr or result.stdout)
+    return {"resumed": True, "mode": "auto"}
+
+
+@app.get("/api/control/status")
+def control_status() -> dict:
+    result = shell("timeout 3 ros2 topic echo --once /autocar/control_status", timeout=5.0)
+    if result.returncode not in (0, 124):
+        raise HTTPException(status_code=500, detail=result.stderr or result.stdout)
+    raw = result.stdout.strip()
+    status = None
+    try:
+        status = parse_control_status_echo(raw)
+    except json.JSONDecodeError:
+        status = None
+    return {"raw": raw, "status": status}
 
 
 @app.post("/api/navigation/goal")

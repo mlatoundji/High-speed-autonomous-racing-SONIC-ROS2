@@ -6,6 +6,7 @@ ENV AUTOCAR_SHARED_DIR=/workspace/shared
 ENV AUTOCAR_LOG_DIR=/workspace/runtime/logs
 ENV DISPLAY=:1
 ENV LIBGL_ALWAYS_SOFTWARE=1
+ENV QT_X11_NO_MITSHM=1
 ENV VNC_RESOLUTION=1280x800
 
 SHELL ["/bin/bash", "-lc"]
@@ -37,7 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 
-COPY ROS2_Foxy_Container/api/requirements.txt /tmp/api-requirements.txt
+COPY container/api/requirements.txt /tmp/api-requirements.txt
 RUN python3 -m pip install --no-cache-dir --upgrade pip \
     && python3 -m pip install --no-cache-dir -r /tmp/api-requirements.txt
 
@@ -48,8 +49,8 @@ RUN printf "empy<4\n" > /tmp/ros-foxy-constraints.txt \
     && source /opt/ros/foxy/setup.bash \
     && colcon build --symlink-install
 
-COPY ROS2_Foxy_Container/api /workspace/api
-COPY ROS2_Foxy_Container/docker/entrypoint.sh /entrypoint.sh
+COPY container/api /workspace/api
+COPY container/docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
     && mkdir -p /workspace/shared /workspace/runtime/logs
 
