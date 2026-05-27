@@ -21,8 +21,12 @@ from launch_ros.actions import Node
 
 def _nav_setup(context, *args, **kwargs):
     navpkg = 'autocar_nav_pure_pursuit'
-    navconfig = os.path.join(
-        get_package_share_directory(navpkg), 'config', 'navigation_params.yaml')
+    override = LaunchConfiguration('nav_config').perform(context).strip()
+    if override:
+        navconfig = override
+    else:
+        navconfig = os.path.join(
+            get_package_share_directory(navpkg), 'config', 'navigation_params.yaml')
     return navigation_nodes(context, navpkg, 'pure_pursuit', navconfig)
 
 
@@ -64,6 +68,14 @@ def generate_launch_description():
             'line',
             default_value='centerline',
             description='Waypoint track: centerline or racing.',
+        ),
+        DeclareLaunchArgument(
+            'nav_config',
+            default_value='',
+            description=(
+                'Absolute path to navigation_params YAML '
+                '(empty = package share autocar_nav_pure_pursuit/config/navigation_params.yaml).'
+            ),
         ),
         *experiment_launch_arguments(),
 

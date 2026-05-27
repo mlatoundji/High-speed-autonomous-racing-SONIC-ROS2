@@ -5,6 +5,10 @@ Examples:
     python3 scripts/benchmark.py --smoke
     python3 scripts/benchmark.py --config scripts/configs/r4_latency_sweep.yaml
     python3 scripts/benchmark.py --config r4_latency_sweep.yaml --dry-run
+
+Pure Pursuit runs may include inline ``navigation:`` (full ROS parameter YAML)
+or ``nav_config:`` (repo-relative path to a YAML file); see
+``scripts/configs/r3_pp_racing_optional.yaml``.
 """
 
 from __future__ import annotations
@@ -18,10 +22,12 @@ import statistics
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import FrozenSet, Optional
+
+import shlex
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -94,9 +100,10 @@ class BenchmarkRun:
     odom_noise_std: float
     lap_count: int
     warmup_laps: int
+    nav_config: Optional[str] = None
 
     def as_dict(self) -> dict:
-        return {
+        d = {
             'stack': self.stack,
             'profile': self.profile,
             'line': self.line,
@@ -105,6 +112,17 @@ class BenchmarkRun:
             'lap_count': self.lap_count,
             'warmup_laps': self.warmup_laps,
         }
+        if self.nav_config is not None:
+            d['nav_config'] = self.nav_config
+        return d
+
+
+@dataclass(frozen=True)
+class BenchmarkRunSpec:
+    """One entry from a benchmark YAML: resolved run fields plus optional inline ``navigation``."""
+
+    run: BenchmarkRun
+    navigation: Optional[dict] = None
 
 
 def _log(msg: str) -> None:
@@ -146,6 +164,20 @@ def normalize_run(raw: dict, default_warmup_laps: int) -> BenchmarkRun:
     if line not in VALID_LINES:
         sys.exit(f'unknown line {line!r}; use centerline or racing')
 
+    nav_raw = raw.get('nav_config')
+    nav_config: Optional[str] = None
+    if nav_raw is not None:
+        if not isinstance(nav_raw, str) or not str(nav_raw).strip():
+            sys.exit('nav_config must be a non-empty string when set')
+        p = Path(str(nav_raw).strip())
+        if not p.is_absolute():
+            p = (_REPO_ROOT / p).resolve()
+        else:
+            p = p.resolve()
+        if not p.is_file():
+            sys.exit(f'nav_config file not found: {p}')
+        nav_config = str(p)
+
     return BenchmarkRun(
         stack=stack,
         profile=str(raw.get('profile', 'default')),
@@ -154,14 +186,48 @@ def normalize_run(raw: dict, default_warmup_laps: int) -> BenchmarkRun:
         odom_noise_std=float(raw.get('odom_noise_std', 0.0)),
         lap_count=lap_count,
         warmup_laps=warmup_laps,
+        nav_config=nav_config,
     )
 
 
-def load_runs(path: Path, default_warmup_laps: int = 1) -> list[BenchmarkRun]:
-    return [
-        normalize_run(entry, default_warmup_laps)
-        for entry in load_config_file(path)
-    ]
+def load_run_specs(path: Path, default_warmup_laps: int = 1) -> list[BenchmarkRunSpec]:
+    specs: list[BenchmarkRunSpec] = []
+    for entry in load_config_file(path):
+        if not isinstance(entry, dict):
+            sys.exit(f'each run must be a mapping, got {type(entry).__name__}')
+        raw = dict(entry)
+        navigation = raw.pop('navigation', None)
+        if navigation is not None and not isinstance(navigation, dict):
+            sys.exit('navigation must be a mapping (YAML dict) when set')
+        run = normalize_run(raw, default_warmup_laps)
+        if navigation is not None and run.nav_config is not None:
+            sys.exit('use only one of navigation (inline) or nav_config (file path), not both')
+        specs.append(BenchmarkRunSpec(run=run, navigation=navigation))
+    return specs
+
+
+def materialize_navigation_overrides(
+    specs: list[BenchmarkRunSpec],
+    work_dir: Path,
+) -> list[BenchmarkRun]:
+    """Write inline ``navigation`` dicts to ``work_dir/nav_overrides`` and set ``nav_config``."""
+    try:
+        import yaml
+    except ImportError:
+        sys.exit('PyYAML required: pip install pyyaml')
+
+    runs: list[BenchmarkRun] = []
+    nav_root = work_dir / 'nav_overrides'
+    for i, spec in enumerate(specs, start=1):
+        if spec.navigation is None:
+            runs.append(spec.run)
+            continue
+        nav_root.mkdir(parents=True, exist_ok=True)
+        path = nav_root / f'run_{i:03d}.yaml'
+        with path.open('w', encoding='utf-8') as f:
+            yaml.safe_dump(spec.navigation, f, default_flow_style=False, sort_keys=False)
+        runs.append(replace(spec.run, nav_config=str(path.resolve())))
+    return runs
 
 
 def config_source_path(args: argparse.Namespace) -> Path:
@@ -317,7 +383,7 @@ def read_lap_rows(csv_path: Path) -> list:
 def build_launch_command(run: BenchmarkRun) -> str:
     launch_file = STACK_LAUNCH_FILES[run.stack]
     ros_distro = os.environ.get('ROS_DISTRO', 'humble')
-    return (
+    cmd = (
         f'source /opt/ros/{ros_distro}/setup.bash && '
         'source install/setup.bash && '
         f'ros2 launch launches {launch_file} '
@@ -326,6 +392,11 @@ def build_launch_command(run: BenchmarkRun) -> str:
         f'latency_ms:={run.latency_ms} '
         f'odom_noise_std:={run.odom_noise_std}'
     )
+    if run.stack == 'pure_pursuit' and run.nav_config:
+        nav = run.nav_config
+        nav_arg = shlex.quote(nav) if any(c in nav for c in ' \t\n') else nav
+        cmd += f' nav_config:={nav_arg}'
+    return cmd
 
 
 def execute_run(run: BenchmarkRun, results_root: Path) -> dict:
@@ -425,6 +496,7 @@ def summarize_results(results: list) -> list:
             'line': run.line,
             'latency_ms': run.latency_ms,
             'odom_noise_std': run.odom_noise_std,
+            'nav_config': run.nav_config,
             'session_id': entry['session_id'],
             'run_dir': entry['run_dir'],
             'lap_count': run.lap_count,
@@ -579,23 +651,31 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
-def resolve_runs(args: argparse.Namespace) -> list[BenchmarkRun]:
+def resolve_run_specs(args: argparse.Namespace) -> list[BenchmarkRunSpec]:
     if args.smoke:
-        return [normalize_run(SMOKE_RUN, args.warmup_laps)]
+        return [
+            BenchmarkRunSpec(
+                run=normalize_run(SMOKE_RUN, args.warmup_laps),
+                navigation=None,
+            ),
+        ]
 
     if args.config is None:
         build_parser().error('one of --config or --smoke is required')
 
-    return load_runs(resolve_config_path(args.config), default_warmup_laps=args.warmup_laps)
+    return load_run_specs(resolve_config_path(args.config), default_warmup_laps=args.warmup_laps)
 
 
 def main(argv: Optional[list] = None) -> None:
     args = build_parser().parse_args(argv)
 
-    runs = resolve_runs(args)
-    _log(f'{len(runs)} run(s):')
-    for run in runs:
-        _log(f'  {run.as_dict()}')
+    specs = resolve_run_specs(args)
+    _log(f'{len(specs)} run(s):')
+    for i, spec in enumerate(specs, 1):
+        line = f'  {i}: {spec.run.as_dict()}'
+        if spec.navigation is not None:
+            line += f' + navigation: {list(spec.navigation.keys())}'
+        _log(line)
     if args.dry_run:
         return
 
@@ -605,6 +685,8 @@ def main(argv: Optional[list] = None) -> None:
     tag = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
     out_dir = args.output_dir or (root / f'benchmark_{tag}')
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    runs = materialize_navigation_overrides(specs, out_dir)
 
     config_path = write_benchmark_config(
         out_dir,
