@@ -1,0 +1,1075 @@
+<?xml version="1.0"?>
+<!--
+  F1-style street circuit (Albert Park inspired), ~750 m centerline
+
+  Try sending commands:
+
+    ros2 topic pub /demo/cmd_demo geometry_msgs/msg/Twist '{linear: {x: 1.0}, angular: {z: 0.1}}' -1
+
+  Try listening to odometry:
+
+    ros2 topic echo /demo/odom_demo
+
+  Try listening to odometer reading(linear distance convered):
+
+    ros2 topic echo /demo/distance_demo
+
+  Try listening to TF:
+
+    ros2 run tf2_ros tf2_echo odom_demo chassis
+
+    and other links
+-->
+<sdf version="1.6">
+  <world name="default">
+
+    <!-- ===== Scene: blue sky with moving clouds + soft ambient ===== -->
+    <scene>
+      <ambient>0.45 0.45 0.50 1</ambient>
+      <background>0.55 0.78 0.98 1</background>
+      <shadows>true</shadows>
+      <sky>
+        <clouds>
+          <speed>4</speed>
+          <direction>1.2</direction>
+          <humidity>0.45</humidity>
+          <mean_size>0.55</mean_size>
+          <ambient>0.85 0.85 0.85 1</ambient>
+        </clouds>
+      </sky>
+    </scene>
+
+    <!-- ===== Warm afternoon sunlight, casting shadows ===== -->
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0.00 -125.5 0.0 0 0 1.5430</pose>
+      <diffuse>1.00 0.93 0.80 1</diffuse>
+      <specular>0.45 0.45 0.40 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.45 0.25 -0.85</direction>
+    </light>
+
+    <!-- Default ground_plane (light gray). Tinted warm by the sunset light.
+         A custom colored plane at z=0 caused Z-fighting with the <road>
+         element, making the road flicker / disappear, so we keep the
+         stock plane which is proven to render the road correctly. -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+
+    <model name="autocar">
+      <!-- Spawn on centerline 8 m before waypoint 0 (-69.92, -43.27).
+           Eastbound clockwise lap; yaw=-1.5709 faces along-track. -->
+      <pose>-71.86 -43.27 0.0 0 0 -1.5709</pose>
+
+      <link name='base_link' />
+
+      <joint name='chassis_link_joint' type='fixed'>
+        <pose>0.0 0.0 0.0 0 0 0</pose>
+        <parent>base_link</parent>
+        <child>chassis_link</child>
+      </joint>
+
+      <joint name="hokuyo_joint" type="fixed">
+        <parent>base_link</parent>
+        <child>hokuyo_link</child>
+        <pose>0 0 0 0 0 0</pose>
+        <axis>
+          <xyz>0 0 1</xyz>
+        </axis>
+      </joint>
+
+      <link name="hokuyo_link">
+        <sensor name="head_hokuyo_sensor" type="ray">
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+          <pose relative_to='base_link'>0 2.34 0.72 0 0 1.5708</pose>
+          <update_rate>40</update_rate>
+          <ray>
+            <scan>
+              <horizontal>
+                <samples>720</samples>
+                <resolution>1.000000</resolution>
+                <min_angle>-1.570796</min_angle>
+                <max_angle>1.570796</max_angle>
+              </horizontal>
+            </scan>
+            <range>
+              <min>0.120000</min>
+              <max>30.0</max>
+              <resolution>0.010</resolution>
+            </range>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>0.01</stddev>
+            </noise>
+          </ray>
+          <plugin name="gazebo_ros_head_hokuyo_controller" filename="libgazebo_ros_ray_sensor.so">
+            <ros>
+              <remapping>~/out:=scan</remapping>
+            </ros>
+            <output_type>sensor_msgs/LaserScan</output_type>
+            <frame_name>hokuyo_link</frame_name>
+          </plugin>
+        </sensor>
+      </link>
+
+      <joint name="third_person_camera_joint" type="fixed">
+        <parent>base_link</parent>
+        <child>third_person_camera_link</child>
+      </joint>
+
+      <link name="third_person_camera_link">
+        <pose relative_to="base_link">0 -8 3.5 0 0.25 1.5708</pose>
+        <sensor name="third_person_camera" type="camera">
+          <always_on>true</always_on>
+          <visualize>true</visualize>
+          <update_rate>30</update_rate>
+          <camera>
+            <horizontal_fov>1.2</horizontal_fov>
+            <image>
+              <width>1280</width>
+              <height>720</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>300</far>
+            </clip>
+          </camera>
+          <plugin name="third_person_camera_controller" filename="libgazebo_ros_camera.so">
+            <ros>
+              <namespace>autocar</namespace>
+              <remapping>image_raw:=third_person_camera/image_raw</remapping>
+              <remapping>camera_info:=third_person_camera/camera_info</remapping>
+            </ros>
+            <frame_name>third_person_camera_link</frame_name>
+          </plugin>
+        </sensor>
+      </link>
+
+      <link name='chassis_link'>
+        <inertial>
+          <pose>1e-06 0.07307 0.65096 0 -0 0</pose>
+          <mass>1580</mass>
+          <inertia>
+            <ixx>1997.86</ixx>
+            <ixy>-3e-05</ixy>
+            <ixz>-1e-06</ixz>
+            <iyy>442.769</iyy>
+            <iyz>62.5206</iyz>
+            <izz>2238.05</izz>
+          </inertia>
+        </inertial>
+        <collision name='chassis_link_fixed_joint_lump__chassis_link_collision'>
+          <pose>0 0 0.46936 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/chassis_link.stl</uri>
+            </mesh>
+          </geometry>
+          <surface>
+            <contact>
+              <ode />
+            </contact>
+            <friction>
+              <ode>
+                <mu>0.2</mu>
+                <mu2>0.2</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <collision name='chassis_link_fixed_joint_lump__spoiler_link_collision_1'>
+          <pose>0 0.05 0.41936 1.5708 -0 3.14159</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/spoiler.stl</uri>
+            </mesh>
+          </geometry>
+          <surface>
+            <contact>
+              <ode />
+            </contact>
+            <friction>
+              <ode>
+                <mu>0.2</mu>
+                <mu2>0.2</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='chassis_link_fixed_joint_lump__chassis_link_visual'>
+          <pose>0 0 0.46936 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/chassis_link.stl</uri>
+            </mesh>
+          </geometry>
+          <!-- Glossy racing red. -->
+          <material>
+            <ambient>0.35 0.02 0.02 1</ambient>
+            <diffuse>0.85 0.05 0.05 1</diffuse>
+            <specular>0.9 0.9 0.9 1</specular>
+            <emissive>0.04 0.0 0.0 1</emissive>
+          </material>
+        </visual>
+        <visual name='chassis_link_fixed_joint_lump__spoiler_link_visual_1'>
+          <pose>0 0.05 0.41936 1.5708 -0 3.14159</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/spoiler.stl</uri>
+            </mesh>
+          </geometry>
+          <!-- Matte carbon-black spoiler. -->
+          <material>
+            <ambient>0.02 0.02 0.02 1</ambient>
+            <diffuse>0.08 0.08 0.08 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+          </material>
+        </visual>
+        <!-- <velocity_decay/> -->
+        <!--  <gravity>1</gravity> -->
+        <!--  <gravity>1</gravity> -->
+        <!-- <velocity_decay/> -->
+        <self_collide>1</self_collide>
+        <!--  <gravity>1</gravity> -->
+      </link>
+
+      <joint name='bl_axle' type='revolute'>
+        <pose relative_to='chassis_link'>-0.875 -1.01364 0.324997 0 -0 0</pose>
+        <parent>chassis_link</parent>
+        <child>bl_1</child>
+        <axis>
+          <xyz>-1 0 0</xyz>
+          <dynamics>
+            <friction>12.031606150200002</friction>
+          </dynamics>
+        </axis>
+      </joint>
+      <link name='bl_1'>
+        <pose relative_to='bl_axle'>0 0 0 0 -0 0</pose>
+        <inertial>
+          <pose>-0.0377 0 -0 0 -0 0</pose>
+          <mass>24.5</mass>
+          <inertia>
+            <ixx>1.84514</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1.04961</iyy>
+            <iyz>0</iyz>
+            <izz>1.04961</izz>
+          </inertia>
+        </inertial>
+        <collision name='bl_1_collision'>
+          <pose relative_to='bl_axle'>0 0 0 0 1.5708 0</pose>
+          <geometry>
+            <cylinder>
+              <radius>.3425</radius>
+              <length>.22</length>
+            </cylinder>
+          </geometry>
+          <surface>
+            <contact>
+              <ode />
+            </contact>
+            <friction>
+              <ode>
+                <mu>1.7</mu>
+                <mu2>1.7</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='bl_1_visual'>
+          <pose>0.875 1.0136 0.1444 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/bl_1.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.02 0.02 0.02 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+            <specular>0.4 0.4 0.4 1</specular>
+          </material>
+        </visual>
+        <!--  <gravity>1</gravity> -->
+        <!-- <velocity_decay/> -->
+        <self_collide>1</self_collide>
+      </link>
+      <joint name='br_axle' type='revolute'>
+        <pose relative_to='chassis_link'>0.875 -1.01364 0.324997 0 -0 0</pose>
+        <parent>chassis_link</parent>
+        <child>br_1</child>
+        <axis>
+          <xyz>-1 0 0</xyz>
+          <dynamics>
+            <friction>12.031606150200002</friction>
+          </dynamics>
+        </axis>
+      </joint>
+      <link name='br_1'>
+        <pose relative_to='br_axle'>0 0 0 0 -0 0</pose>
+        <inertial>
+          <pose>-0.0377 0 -0 0 -0 0</pose>
+          <mass>24.5</mass>
+          <inertia>
+            <ixx>1.84514</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1.04961</iyy>
+            <iyz>0</iyz>
+            <izz>1.04961</izz>
+          </inertia>
+        </inertial>
+        <collision name='br_1_collision'>
+          <pose relative_to='br_axle'>0 0 0 0 1.5708 0</pose>
+          <geometry>
+            <cylinder>
+              <radius>.3425</radius>
+              <length>.22</length>
+            </cylinder>
+          </geometry>
+          <surface>
+            <contact>
+              <ode />
+            </contact>
+            <friction>
+              <ode>
+                <mu>1.7</mu>
+                <mu2>1.7</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='br_1_visual'>
+          <pose>-0.875 1.0136 0.1444 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/br_1.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.02 0.02 0.02 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+            <specular>0.4 0.4 0.4 1</specular>
+          </material>
+        </visual>
+        <!--  <gravity>1</gravity> -->
+        <!-- <velocity_decay/> -->
+        <self_collide>1</self_collide>
+      </link>
+      <joint name='l_steer' type='revolute'>
+        <pose relative_to='chassis_link'>-0.825 1.51736 0.324997 0 -0 0</pose>
+        <parent>chassis_link</parent>
+        <child>l_steer_1</child>
+        <axis>
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>-0.95</lower>
+            <upper>0.95</upper>
+          </limit>
+          <dynamics>
+            <friction>18.0474092253</friction>
+          </dynamics>
+        </axis>
+      </joint>
+      <link name='l_steer_1'>
+        <pose relative_to='l_steer'>0 0 0 0 -0 0</pose>
+        <inertial>
+          <pose>0.003381 0 0.02162 0 -0 0</pose>
+          <mass>1</mass>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <!--  <gravity>1</gravity> -->
+        <!-- <velocity_decay/> -->
+        <self_collide>1</self_collide>
+      </link>
+
+      <joint name='fl_axle' type='revolute'>
+        <pose relative_to='l_steer_1'>-0.05 0 0 0 -0 0</pose>
+        <parent>l_steer_1</parent>
+        <child>fl_1</child>
+        <axis>
+          <xyz>-1 0 0</xyz>
+          <dynamics>
+            <friction>12.031606150200002</friction>
+          </dynamics>
+        </axis>
+      </joint>
+      <link name='fl_1'>
+        <pose relative_to='fl_axle'>0 0 0 0 -0 0</pose>
+        <inertial>
+          <pose>-0.0377 0 -0 0 -0 0</pose>
+          <mass>24.5</mass>
+          <inertia>
+            <ixx>1.84514</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1.04961</iyy>
+            <iyz>0</iyz>
+            <izz>1.04961</izz>
+          </inertia>
+        </inertial>
+        <collision name='fl_1_collision'>
+          <pose>0.875 -1.5174 0.1444 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/fl_1.stl</uri>
+            </mesh>
+          </geometry>
+          <surface>
+            <contact>
+              <ode />
+            </contact>
+            <friction>
+              <ode>
+                <mu>1.1</mu>
+                <mu2>1.1</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='fl_1_visual'>
+          <pose>0.875 -1.5174 0.1444 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/fl_1.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.02 0.02 0.02 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+            <specular>0.4 0.4 0.4 1</specular>
+          </material>
+        </visual>
+        <!--  <gravity>1</gravity> -->
+        <!-- <velocity_decay/> -->
+        <self_collide>1</self_collide>
+      </link>
+      <joint name='r_steer' type='revolute'>
+        <pose relative_to='chassis_link'>0.825 1.51736 0.324997 0 -0 0</pose>
+        <parent>chassis_link</parent>
+        <child>r_steer_1</child>
+        <axis>
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>-0.95</lower>
+            <upper>0.95</upper>
+          </limit>
+          <dynamics>
+            <damping>0.01</damping>
+            <friction>18.0474092253</friction>
+          </dynamics>
+        </axis>
+      </joint>
+      <link name='r_steer_1'>
+        <pose relative_to='r_steer'>0 0 0 0 -0 0</pose>
+        <inertial>
+          <pose>0.003381 0 0.02162 0 -0 0</pose>
+          <mass>1</mass>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <!--  <gravity>1</gravity> -->
+        <!-- <velocity_decay/> -->
+        <self_collide>1</self_collide>
+      </link>
+      <joint name='fr_axle' type='revolute'>
+        <pose relative_to='r_steer_1'>0.05 0 0 0 -0 0</pose>
+        <parent>r_steer_1</parent>
+        <child>fr_1</child>
+        <axis>
+          <xyz>-1 0 0</xyz>
+          <dynamics>
+            <friction>12.031606150200002</friction>
+          </dynamics>
+        </axis>
+      </joint>
+      <link name='fr_1'>
+        <pose relative_to='fr_axle'>0 0 0 0 -0 0</pose>
+        <inertial>
+          <pose>-0.0377 0 -0 0 -0 0</pose>
+          <mass>24.5</mass>
+          <inertia>
+            <ixx>1.84514</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1.04961</iyy>
+            <iyz>0</iyz>
+            <izz>1.04961</izz>
+          </inertia>
+        </inertial>
+        <collision name='fr_1_collision'>
+          <pose>-0.875 -1.5174 0.1444 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/fr_1.stl</uri>
+            </mesh>
+          </geometry>
+          <surface>
+            <contact>
+              <ode />
+            </contact>
+            <friction>
+              <ode>
+                <mu>1.7</mu>
+                <mu2>1.7</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='fr_1_visual'>
+          <pose>-0.875 -1.5174 0.1444 0 -0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.001 0.001 0.001</scale>
+              <uri>model://autocar/meshes/fr_1.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.02 0.02 0.02 1</ambient>
+            <diffuse>0.1 0.1 0.1 1</diffuse>
+            <specular>0.4 0.4 0.4 1</specular>
+          </material>
+        </visual>
+        <!--  <gravity>1</gravity> -->
+        <!-- <velocity_decay/> -->
+        <self_collide>1</self_collide>
+      </link>
+
+      <link name="steering_wheel" />
+
+      <joint name="steering_joint" type="revolute">
+        <pose>-0.002 0 0 0 0 0</pose>
+        <parent>chassis_link</parent>
+        <child>steering_wheel</child>
+        <axis>
+          <xyz>-0.964118 0.000768 0.265556</xyz>
+          <limit>
+            <lower>-100</lower>
+            <upper>100</upper>
+          </limit>
+          <dynamics>
+            <damping>1.0</damping>
+          </dynamics>
+          <use_parent_model_frame>true</use_parent_model_frame>
+        </axis>
+        <physics>
+          <ode>
+            <cfm_damping>1</cfm_damping>
+          </ode>
+        </physics>
+      </joint>
+
+      <plugin name='ackermann_drive' filename='libgazebo_ros_ackermann_drive.so'>
+
+        <ros>
+          <namespace>autocar</namespace>
+          <remapping>cmd_vel:=cmd_vel</remapping>
+          <remapping>odom:=odom</remapping>
+          <remapping>distance:=distance</remapping>
+        </ros>
+
+        <update_rate>100.0</update_rate>
+
+        <!-- wheels -->
+        <front_left_joint>fl_axle</front_left_joint>
+        <front_right_joint>fr_axle</front_right_joint>
+        <rear_left_joint>bl_axle</rear_left_joint>
+        <rear_right_joint>br_axle</rear_right_joint>
+        <left_steering_joint>l_steer</left_steering_joint>
+        <right_steering_joint>r_steer</right_steering_joint>
+        <steering_wheel_joint>steering_joint</steering_wheel_joint>
+
+
+        <!-- Max absolute steer angle for tyre in radians-->
+        <!-- Any cmd_vel angular z greater than this would be capped -->
+        <max_steer>0.85</max_steer>
+
+        <!-- Max absolute steering angle of steering wheel -->
+        <!-- Max absolute steering angle of steering wheel -->
+        <max_steering_angle>7.85</max_steering_angle>
+
+        <!-- Max absolute linear speed in m/s -->
+        <max_speed>20</max_speed>
+
+        <!-- PID tuning -->
+        <left_steering_pid_gain>4000 0 1</left_steering_pid_gain>
+        <left_steering_i_range>0 0</left_steering_i_range>
+        <right_steering_pid_gain>4000 0 1</right_steering_pid_gain>
+        <right_steering_i_range>0 0</right_steering_i_range>
+        <linear_velocity_pid_gain>4000 0 1</linear_velocity_pid_gain>
+        <linear_velocity_i_range>0 0</linear_velocity_i_range>
+
+        <!-- output -->
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>true</publish_odom_tf>
+        <publish_wheel_tf>true</publish_wheel_tf>
+        <publish_distance>true</publish_distance>
+
+        <odometry_frame>odom</odometry_frame>
+        <robot_base_frame>base_link</robot_base_frame>
+
+      </plugin>
+
+    </model>
+
+    <!-- ===== Race-track (Albert Park) ===== -->
+    <road name="track">
+      <width>16.0</width>
+      <point>-69.921 -43.272 0</point>
+      <point>-68.490 -43.293 0</point>
+      <point>-67.058 -43.287 0</point>
+      <point>-65.626 -43.273 0</point>
+      <point>-64.194 -43.261 0</point>
+      <point>-62.762 -43.251 0</point>
+      <point>-61.330 -43.243 0</point>
+      <point>-59.898 -43.236 0</point>
+      <point>-58.466 -43.230 0</point>
+      <point>-57.034 -43.225 0</point>
+      <point>-55.602 -43.221 0</point>
+      <point>-54.170 -43.218 0</point>
+      <point>-52.738 -43.216 0</point>
+      <point>-51.306 -43.214 0</point>
+      <point>-49.874 -43.212 0</point>
+      <point>-48.442 -43.211 0</point>
+      <point>-47.010 -43.211 0</point>
+      <point>-45.578 -43.211 0</point>
+      <point>-44.146 -43.210 0</point>
+      <point>-42.714 -43.211 0</point>
+      <point>-41.282 -43.211 0</point>
+      <point>-39.850 -43.211 0</point>
+      <point>-38.418 -43.211 0</point>
+      <point>-36.986 -43.211 0</point>
+      <point>-35.554 -43.211 0</point>
+      <point>-34.122 -43.211 0</point>
+      <point>-32.690 -43.210 0</point>
+      <point>-31.258 -43.210 0</point>
+      <point>-29.826 -43.209 0</point>
+      <point>-28.394 -43.209 0</point>
+      <point>-26.962 -43.208 0</point>
+      <point>-25.530 -43.206 0</point>
+      <point>-24.098 -43.205 0</point>
+      <point>-22.666 -43.203 0</point>
+      <point>-21.234 -43.201 0</point>
+      <point>-19.802 -43.199 0</point>
+      <point>-18.370 -43.197 0</point>
+      <point>-16.938 -43.195 0</point>
+      <point>-15.506 -43.193 0</point>
+      <point>-14.075 -43.190 0</point>
+      <point>-12.643 -43.189 0</point>
+      <point>-11.211 -43.187 0</point>
+      <point>-9.779 -43.186 0</point>
+      <point>-8.347 -43.185 0</point>
+      <point>-6.915 -43.184 0</point>
+      <point>-5.483 -43.184 0</point>
+      <point>-4.051 -43.185 0</point>
+      <point>-2.619 -43.186 0</point>
+      <point>-1.187 -43.188 0</point>
+      <point>0.245 -43.191 0</point>
+      <point>1.677 -43.195 0</point>
+      <point>3.109 -43.199 0</point>
+      <point>4.541 -43.205 0</point>
+      <point>5.973 -43.211 0</point>
+      <point>7.405 -43.219 0</point>
+      <point>8.837 -43.228 0</point>
+      <point>10.269 -43.238 0</point>
+      <point>11.701 -43.249 0</point>
+      <point>13.133 -43.262 0</point>
+      <point>14.565 -43.273 0</point>
+      <point>15.997 -43.258 0</point>
+      <point>17.410 -43.068 0</point>
+      <point>18.519 -42.213 0</point>
+      <point>19.066 -40.898 0</point>
+      <point>19.525 -39.542 0</point>
+      <point>20.059 -38.214 0</point>
+      <point>20.728 -36.948 0</point>
+      <point>21.536 -35.767 0</point>
+      <point>22.460 -34.674 0</point>
+      <point>23.493 -33.683 0</point>
+      <point>24.617 -32.797 0</point>
+      <point>25.829 -32.036 0</point>
+      <point>27.113 -31.403 0</point>
+      <point>28.459 -30.917 0</point>
+      <point>29.852 -30.591 0</point>
+      <point>31.276 -30.450 0</point>
+      <point>32.708 -30.448 0</point>
+      <point>34.139 -30.485 0</point>
+      <point>35.570 -30.528 0</point>
+      <point>37.002 -30.575 0</point>
+      <point>38.433 -30.624 0</point>
+      <point>39.864 -30.672 0</point>
+      <point>41.295 -30.716 0</point>
+      <point>42.727 -30.753 0</point>
+      <point>44.159 -30.779 0</point>
+      <point>45.590 -30.792 0</point>
+      <point>47.022 -30.791 0</point>
+      <point>48.454 -30.775 0</point>
+      <point>49.886 -30.742 0</point>
+      <point>51.317 -30.692 0</point>
+      <point>52.747 -30.625 0</point>
+      <point>54.177 -30.538 0</point>
+      <point>55.605 -30.433 0</point>
+      <point>57.032 -30.313 0</point>
+      <point>58.458 -30.180 0</point>
+      <point>59.882 -30.038 0</point>
+      <point>61.307 -29.890 0</point>
+      <point>62.731 -29.739 0</point>
+      <point>64.155 -29.588 0</point>
+      <point>65.578 -29.433 0</point>
+      <point>67.001 -29.268 0</point>
+      <point>68.421 -29.082 0</point>
+      <point>69.837 -28.872 0</point>
+      <point>71.248 -28.629 0</point>
+      <point>72.653 -28.349 0</point>
+      <point>74.048 -28.029 0</point>
+      <point>75.437 -27.681 0</point>
+      <point>76.823 -27.319 0</point>
+      <point>78.208 -26.955 0</point>
+      <point>79.594 -26.595 0</point>
+      <point>80.980 -26.236 0</point>
+      <point>82.367 -25.880 0</point>
+      <point>83.753 -25.521 0</point>
+      <point>85.138 -25.156 0</point>
+      <point>86.519 -24.779 0</point>
+      <point>87.896 -24.384 0</point>
+      <point>89.266 -23.968 0</point>
+      <point>90.627 -23.524 0</point>
+      <point>91.949 -22.981 0</point>
+      <point>93.014 -22.050 0</point>
+      <point>93.264 -20.671 0</point>
+      <point>92.746 -19.352 0</point>
+      <point>91.892 -18.203 0</point>
+      <point>91.104 -17.008 0</point>
+      <point>90.363 -15.783 0</point>
+      <point>89.592 -14.576 0</point>
+      <point>88.789 -13.390 0</point>
+      <point>87.961 -12.222 0</point>
+      <point>87.135 -11.053 0</point>
+      <point>86.413 -9.818 0</point>
+      <point>85.969 -8.463 0</point>
+      <point>86.098 -7.052 0</point>
+      <point>86.752 -5.787 0</point>
+      <point>87.737 -4.751 0</point>
+      <point>88.814 -3.807 0</point>
+      <point>89.878 -2.849 0</point>
+      <point>90.935 -1.882 0</point>
+      <point>91.996 -0.921 0</point>
+      <point>93.066 0.031 0</point>
+      <point>94.139 0.978 0</point>
+      <point>95.210 1.930 0</point>
+      <point>96.269 2.893 0</point>
+      <point>97.311 3.876 0</point>
+      <point>98.326 4.886 0</point>
+      <point>99.311 5.924 0</point>
+      <point>100.302 6.958 0</point>
+      <point>101.341 7.943 0</point>
+      <point>102.398 8.909 0</point>
+      <point>103.048 10.160 0</point>
+      <point>103.188 11.579 0</point>
+      <point>103.047 13.004 0</point>
+      <point>102.863 14.424 0</point>
+      <point>102.668 15.843 0</point>
+      <point>102.464 17.260 0</point>
+      <point>102.253 18.676 0</point>
+      <point>102.038 20.092 0</point>
+      <point>101.820 21.507 0</point>
+      <point>101.603 22.923 0</point>
+      <point>101.379 24.337 0</point>
+      <point>101.137 25.748 0</point>
+      <point>100.864 27.154 0</point>
+      <point>100.549 28.551 0</point>
+      <point>100.178 29.934 0</point>
+      <point>99.741 31.297 0</point>
+      <point>99.234 32.637 0</point>
+      <point>98.676 33.955 0</point>
+      <point>98.087 35.260 0</point>
+      <point>97.486 36.560 0</point>
+      <point>96.883 37.859 0</point>
+      <point>96.282 39.159 0</point>
+      <point>95.687 40.461 0</point>
+      <point>95.103 41.768 0</point>
+      <point>94.534 43.083 0</point>
+      <point>93.987 44.406 0</point>
+      <point>93.466 45.740 0</point>
+      <point>92.979 47.086 0</point>
+      <point>92.529 48.446 0</point>
+      <point>92.124 49.819 0</point>
+      <point>91.770 51.207 0</point>
+      <point>91.472 52.607 0</point>
+      <point>91.217 54.016 0</point>
+      <point>90.805 55.384 0</point>
+      <point>89.757 56.225 0</point>
+      <point>88.327 56.198 0</point>
+      <point>86.896 56.234 0</point>
+      <point>85.477 56.417 0</point>
+      <point>84.083 56.743 0</point>
+      <point>82.710 57.150 0</point>
+      <point>81.327 57.520 0</point>
+      <point>79.959 57.941 0</point>
+      <point>78.692 58.602 0</point>
+      <point>77.538 59.448 0</point>
+      <point>76.457 60.387 0</point>
+      <point>75.393 61.345 0</point>
+      <point>74.311 62.284 0</point>
+      <point>73.192 63.177 0</point>
+      <point>72.021 64.000 0</point>
+      <point>70.792 64.735 0</point>
+      <point>69.515 65.383 0</point>
+      <point>68.197 65.941 0</point>
+      <point>66.846 66.415 0</point>
+      <point>65.468 66.802 0</point>
+      <point>64.069 67.107 0</point>
+      <point>62.654 67.326 0</point>
+      <point>61.229 67.462 0</point>
+      <point>59.798 67.507 0</point>
+      <point>58.367 67.465 0</point>
+      <point>56.941 67.328 0</point>
+      <point>55.528 67.097 0</point>
+      <point>54.135 66.771 0</point>
+      <point>52.767 66.348 0</point>
+      <point>51.432 65.831 0</point>
+      <point>50.138 65.219 0</point>
+      <point>48.890 64.517 0</point>
+      <point>47.680 63.750 0</point>
+      <point>46.493 62.949 0</point>
+      <point>45.313 62.139 0</point>
+      <point>44.133 61.328 0</point>
+      <point>42.953 60.516 0</point>
+      <point>41.774 59.704 0</point>
+      <point>40.595 58.891 0</point>
+      <point>39.417 58.077 0</point>
+      <point>38.238 57.264 0</point>
+      <point>37.060 56.450 0</point>
+      <point>35.880 55.638 0</point>
+      <point>34.699 54.829 0</point>
+      <point>33.514 54.024 0</point>
+      <point>32.326 53.225 0</point>
+      <point>31.133 52.433 0</point>
+      <point>29.935 51.648 0</point>
+      <point>28.733 50.870 0</point>
+      <point>27.529 50.096 0</point>
+      <point>26.325 49.320 0</point>
+      <point>25.162 48.485 0</point>
+      <point>24.179 47.456 0</point>
+      <point>24.158 46.074 0</point>
+      <point>24.882 44.844 0</point>
+      <point>25.600 43.606 0</point>
+      <point>26.155 42.288 0</point>
+      <point>26.538 40.909 0</point>
+      <point>26.802 39.502 0</point>
+      <point>26.846 38.078 0</point>
+      <point>26.392 36.724 0</point>
+      <point>25.817 35.413 0</point>
+      <point>25.122 34.162 0</point>
+      <point>24.347 32.958 0</point>
+      <point>23.544 31.772 0</point>
+      <point>22.727 30.596 0</point>
+      <point>21.906 29.423 0</point>
+      <point>21.087 28.248 0</point>
+      <point>20.273 27.070 0</point>
+      <point>19.460 25.891 0</point>
+      <point>18.647 24.712 0</point>
+      <point>17.832 23.535 0</point>
+      <point>17.013 22.360 0</point>
+      <point>16.189 21.189 0</point>
+      <point>15.351 20.028 0</point>
+      <point>14.490 18.884 0</point>
+      <point>13.594 17.767 0</point>
+      <point>12.656 16.685 0</point>
+      <point>11.676 15.641 0</point>
+      <point>10.655 14.637 0</point>
+      <point>9.595 13.675 0</point>
+      <point>8.499 12.753 0</point>
+      <point>7.374 11.868 0</point>
+      <point>6.223 11.016 0</point>
+      <point>5.049 10.195 0</point>
+      <point>3.850 9.412 0</point>
+      <point>2.627 8.668 0</point>
+      <point>1.377 7.970 0</point>
+      <point>0.101 7.320 0</point>
+      <point>-1.201 6.725 0</point>
+      <point>-2.527 6.185 0</point>
+      <point>-3.873 5.697 0</point>
+      <point>-5.234 5.249 0</point>
+      <point>-6.605 4.837 0</point>
+      <point>-7.986 4.459 0</point>
+      <point>-9.378 4.121 0</point>
+      <point>-10.779 3.828 0</point>
+      <point>-12.190 3.586 0</point>
+      <point>-13.610 3.400 0</point>
+      <point>-15.037 3.275 0</point>
+      <point>-16.467 3.213 0</point>
+      <point>-17.899 3.206 0</point>
+      <point>-19.330 3.248 0</point>
+      <point>-20.760 3.329 0</point>
+      <point>-22.188 3.436 0</point>
+      <point>-23.615 3.552 0</point>
+      <point>-25.043 3.663 0</point>
+      <point>-26.471 3.766 0</point>
+      <point>-27.900 3.860 0</point>
+      <point>-29.329 3.949 0</point>
+      <point>-30.759 4.033 0</point>
+      <point>-32.188 4.114 0</point>
+      <point>-33.618 4.193 0</point>
+      <point>-35.048 4.278 0</point>
+      <point>-36.475 4.391 0</point>
+      <point>-37.870 4.694 0</point>
+      <point>-39.118 5.383 0</point>
+      <point>-40.151 6.371 0</point>
+      <point>-41.027 7.503 0</point>
+      <point>-41.894 8.643 0</point>
+      <point>-42.793 9.757 0</point>
+      <point>-43.688 10.875 0</point>
+      <point>-44.558 12.012 0</point>
+      <point>-45.402 13.169 0</point>
+      <point>-46.235 14.334 0</point>
+      <point>-47.149 15.426 0</point>
+      <point>-48.463 15.929 0</point>
+      <point>-49.894 15.976 0</point>
+      <point>-51.324 16.056 0</point>
+      <point>-52.752 16.158 0</point>
+      <point>-54.180 16.269 0</point>
+      <point>-55.607 16.388 0</point>
+      <point>-57.033 16.514 0</point>
+      <point>-58.459 16.646 0</point>
+      <point>-59.885 16.778 0</point>
+      <point>-61.311 16.906 0</point>
+      <point>-62.738 17.025 0</point>
+      <point>-64.167 17.131 0</point>
+      <point>-65.596 17.216 0</point>
+      <point>-67.026 17.285 0</point>
+      <point>-68.456 17.357 0</point>
+      <point>-69.885 17.457 0</point>
+      <point>-71.310 17.602 0</point>
+      <point>-72.736 17.725 0</point>
+      <point>-74.167 17.762 0</point>
+      <point>-75.599 17.796 0</point>
+      <point>-77.030 17.843 0</point>
+      <point>-78.460 17.792 0</point>
+      <point>-79.882 17.625 0</point>
+      <point>-81.292 17.373 0</point>
+      <point>-82.687 17.053 0</point>
+      <point>-84.068 16.674 0</point>
+      <point>-85.432 16.239 0</point>
+      <point>-86.756 15.696 0</point>
+      <point>-88.027 15.036 0</point>
+      <point>-89.278 14.339 0</point>
+      <point>-90.531 13.646 0</point>
+      <point>-91.786 12.956 0</point>
+      <point>-93.042 12.268 0</point>
+      <point>-94.298 11.581 0</point>
+      <point>-95.554 10.893 0</point>
+      <point>-96.810 10.205 0</point>
+      <point>-98.065 9.515 0</point>
+      <point>-99.318 8.823 0</point>
+      <point>-100.570 8.128 0</point>
+      <point>-101.821 7.430 0</point>
+      <point>-103.068 6.727 0</point>
+      <point>-104.313 6.019 0</point>
+      <point>-105.553 5.303 0</point>
+      <point>-106.788 4.578 0</point>
+      <point>-108.017 3.844 0</point>
+      <point>-109.240 3.099 0</point>
+      <point>-110.456 2.342 0</point>
+      <point>-111.666 1.576 0</point>
+      <point>-112.871 0.803 0</point>
+      <point>-114.074 0.026 0</point>
+      <point>-115.275 -0.755 0</point>
+      <point>-116.475 -1.535 0</point>
+      <point>-117.673 -2.320 0</point>
+      <point>-118.825 -3.168 0</point>
+      <point>-119.352 -4.385 0</point>
+      <point>-118.770 -5.688 0</point>
+      <point>-118.141 -6.974 0</point>
+      <point>-117.535 -8.272 0</point>
+      <point>-116.942 -9.575 0</point>
+      <point>-116.346 -10.877 0</point>
+      <point>-115.747 -12.178 0</point>
+      <point>-115.146 -13.478 0</point>
+      <point>-114.546 -14.778 0</point>
+      <point>-113.949 -16.079 0</point>
+      <point>-113.357 -17.384 0</point>
+      <point>-112.773 -18.691 0</point>
+      <point>-112.195 -20.001 0</point>
+      <point>-111.620 -21.313 0</point>
+      <point>-111.044 -22.624 0</point>
+      <point>-110.471 -23.936 0</point>
+      <point>-109.913 -25.255 0</point>
+      <point>-109.301 -26.549 0</point>
+      <point>-108.510 -27.739 0</point>
+      <point>-107.483 -28.731 0</point>
+      <point>-106.245 -29.444 0</point>
+      <point>-104.891 -29.904 0</point>
+      <point>-103.476 -30.112 0</point>
+      <point>-102.046 -30.089 0</point>
+      <point>-100.638 -29.837 0</point>
+      <point>-99.259 -29.452 0</point>
+      <point>-97.883 -29.054 0</point>
+      <point>-96.504 -28.668 0</point>
+      <point>-95.127 -28.274 0</point>
+      <point>-93.752 -27.875 0</point>
+      <point>-92.377 -27.477 0</point>
+      <point>-91.000 -27.084 0</point>
+      <point>-89.621 -26.698 0</point>
+      <point>-88.239 -26.321 0</point>
+      <point>-86.856 -25.951 0</point>
+      <point>-85.470 -25.591 0</point>
+      <point>-84.082 -25.241 0</point>
+      <point>-82.691 -24.900 0</point>
+      <point>-81.299 -24.563 0</point>
+      <point>-79.896 -24.287 0</point>
+      <point>-78.552 -24.646 0</point>
+      <point>-77.942 -25.895 0</point>
+      <point>-78.007 -27.324 0</point>
+      <point>-78.093 -28.753 0</point>
+      <point>-78.174 -30.183 0</point>
+      <point>-78.260 -31.612 0</point>
+      <point>-78.362 -33.040 0</point>
+      <point>-78.483 -34.467 0</point>
+      <point>-78.559 -35.897 0</point>
+      <point>-78.470 -37.324 0</point>
+      <point>-78.096 -38.702 0</point>
+      <point>-77.428 -39.966 0</point>
+      <point>-76.523 -41.072 0</point>
+      <point>-75.416 -41.975 0</point>
+      <point>-74.145 -42.629 0</point>
+      <point>-72.772 -43.028 0</point>
+      <point>-71.351 -43.200 0</point>
+      <point>-69.921 -43.272 0</point>
+      <point>-69.921 -43.272 0</point>
+    </road>
+
+  </world>
+</sdf>

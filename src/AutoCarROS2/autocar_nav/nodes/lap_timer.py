@@ -27,8 +27,10 @@ from autocar_nav.lap_times_paths import LAP_TIMES_CSV_FIELDS, init_lap_times_csv
 
 CSV_FIELDS = list(LAP_TIMES_CSV_FIELDS)
 
-START_X = 103.67
-ROAD_HALF_WIDTH = 8.0
+DEFAULT_FINISH_MODE = 'pos_y'
+DEFAULT_FINISH_LINE_X = 103.67
+DEFAULT_FINISH_Y_CENTER = 0.0
+DEFAULT_FINISH_Y_HALF_WIDTH = 8.0
 
 MIN_LAP_TIME_S = 5.0
 
@@ -52,6 +54,10 @@ class LapTimer(Node):
                 ('latency_ms', 0, desc),
                 ('odom_noise_std', 0.0, desc),
                 ('offtrack_threshold_m', 4.0, desc),
+                ('finish_mode', DEFAULT_FINISH_MODE, desc),
+                ('finish_line_x', DEFAULT_FINISH_LINE_X, desc),
+                ('finish_y_center', DEFAULT_FINISH_Y_CENTER, desc),
+                ('finish_y_half_width', DEFAULT_FINISH_Y_HALF_WIDTH, desc),
             ],
         )
 
@@ -63,6 +69,10 @@ class LapTimer(Node):
         self.latency_ms = int(self.get_parameter('latency_ms').value)
         self.odom_noise_std = float(self.get_parameter('odom_noise_std').value)
         self.offtrack_threshold = float(self.get_parameter('offtrack_threshold_m').value)
+        self.finish_mode = str(self.get_parameter('finish_mode').value)
+        self.finish_line_x = float(self.get_parameter('finish_line_x').value)
+        self.finish_y_center = float(self.get_parameter('finish_y_center').value)
+        self.finish_y_half_width = float(self.get_parameter('finish_y_half_width').value)
 
         lap_times_csv = csv_override or None
         if not lap_times_csv and run_dir:
@@ -117,8 +127,9 @@ class LapTimer(Node):
             f'Lap timer armed (stack={self.stack}, run={run_label}). '
             f'profile={self.profile} latency_ms={self.latency_ms} '
             f'odom_noise_std={self.odom_noise_std:.3f}. '
-            f'Start/finish: x={START_X:.2f}, '
-            f'y in [{-ROAD_HALF_WIDTH:+.1f}, {ROAD_HALF_WIDTH:+.1f}], +Y crossing. '
+            f'Start/finish: mode={self.finish_mode}, '
+            f'x={self.finish_line_x:.2f}, y_center={self.finish_y_center:.2f}, '
+            f'y_half_width={self.finish_y_half_width:.1f}. '
             f'CSV: {self._csv_targets[0]}'
         )
 
@@ -147,11 +158,8 @@ class LapTimer(Node):
         if speed > self.max_speed:
             self.max_speed = speed
 
-        if self.prev_y < 0.0 <= y and abs(x - START_X) < ROAD_HALF_WIDTH * 2:
-            t = -self.prev_y / (y - self.prev_y) if (y - self.prev_y) != 0 else 0.0
-            cross_x = self.prev_x + t * (x - self.prev_x)
-            if cross_x > START_X - ROAD_HALF_WIDTH * 2:
-                self._on_crossing(now)
+        if self._finish_line_crossed(self.prev_x, self.prev_y, x, y):
+            self._on_crossing(now)
 
         self.prev_x, self.prev_y = x, y
 
@@ -185,6 +193,33 @@ class LapTimer(Node):
                     self.steering_rate_max = rate
         self.prev_steer = steer
         self.prev_steer_time = t
+
+    def _finish_line_crossed(self, prev_x, prev_y, x, y):
+        tol = self.finish_y_half_width
+        if self.finish_mode == 'neg_x':
+            if not (prev_x > self.finish_line_x >= x):
+                return False
+            if abs(y - self.finish_y_center) > tol:
+                return False
+            if abs(prev_y - self.finish_y_center) > tol:
+                return False
+            return True
+
+        if self.finish_mode == 'pos_x':
+            if not (prev_x < self.finish_line_x <= x):
+                return False
+            if abs(y - self.finish_y_center) > tol:
+                return False
+            if abs(prev_y - self.finish_y_center) > tol:
+                return False
+            return True
+
+        # Default: +Y crossing through y=finish_y_center near finish_line_x.
+        if not (prev_y < self.finish_y_center <= y):
+            return False
+        t = -prev_y / (y - prev_y) if (y - prev_y) != 0 else 0.0
+        cross_x = prev_x + t * (x - prev_x)
+        return abs(cross_x - self.finish_line_x) < tol * 2
 
     def _publish_live(self):
         count = Int32()

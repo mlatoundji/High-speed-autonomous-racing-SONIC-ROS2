@@ -1,5 +1,6 @@
 """Shared helpers for race stack launch files (centerline / racing line)."""
 
+import json
 import os
 import re
 import tempfile
@@ -23,12 +24,31 @@ RACE_TRACKS = {
             'centerline': 'waypoints.csv',
             'racing': 'waypoints_racing.csv',
         },
+        'lap_timer': {
+            'finish_mode': 'pos_y',
+            'finish_line_x': 103.67,
+            'finish_y_center': 0.0,
+            'finish_y_half_width': 8.0,
+        },
     },
     'oval': {
         'world': 'race_oval.world',
         'waypoints': {
             'centerline': 'waypoints_oval.csv',
             'racing': 'waypoints_oval_racing.csv',
+        },
+        'lap_timer': {
+            'finish_mode': 'pos_y',
+            'finish_line_x': 125.81,
+            'finish_y_center': 0.0,
+            'finish_y_half_width': 8.0,
+        },
+    },
+    'f1_circuit': {
+        'world': 'race_f1_circuit.world',
+        'waypoints': {
+            'centerline': 'waypoints_f1.csv',
+            'racing': 'waypoints_f1_racing.csv',
         },
     },
 }
@@ -79,6 +99,30 @@ def resolve_waypoints_file(track: str, line: str) -> str:
             f'Unknown line {line!r} for track {track!r}; '
             f'use one of: {sorted(cfg["waypoints"])}')
     return cfg['waypoints'][line]
+
+
+def resolve_lap_timer_params(track: str) -> dict:
+    cfg = resolve_track(track)
+    params = dict(cfg.get('lap_timer', {}))
+    if track == 'f1_circuit':
+        meta_path = os.path.join(
+            get_package_share_directory('autocar_racing_line'),
+            'data',
+            'f1_circuit_meta.json',
+        )
+        try:
+            with open(meta_path) as f:
+                finish = json.load(f).get('finish_line', {})
+            if finish:
+                params = {
+                    'finish_mode': finish.get('mode', 'pos_x'),
+                    'finish_line_x': finish.get('line_x', 0.0),
+                    'finish_y_center': finish.get('y_center', 0.0),
+                    'finish_y_half_width': finish.get('y_half_width', 16.0),
+                }
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            pass
+    return params
 
 
 def world_path_from_context(context) -> str:
@@ -136,7 +180,7 @@ def race_launch_arguments(default_track='circuit'):
         DeclareLaunchArgument(
             'track',
             default_value=default_track,
-            description='Race layout: circuit (round) or oval (ellipse, same lap length).',
+            description='Race layout: circuit, oval, or f1_circuit (Albert Park, 5.28 km).',
         ),
         DeclareLaunchArgument(
             'world',
@@ -324,15 +368,18 @@ def navigation_nodes(context, navpkg, stack, navconfig):
             name='lap_timer',
             executable='lap_timer.py',
             parameters=[
-                lap_timer_parameters(
-                    stack,
-                    use_sim_time,
-                    navconfig,
-                    line=line,
-                    profile=profile,
-                    latency_ms=latency_ms,
-                    odom_noise_std=odom_noise_std,
-                ),
+                {
+                    **lap_timer_parameters(
+                        stack,
+                        use_sim_time,
+                        navconfig,
+                        line=line,
+                        profile=profile,
+                        latency_ms=latency_ms,
+                        odom_noise_std=odom_noise_std,
+                    ),
+                    **resolve_lap_timer_params(track),
+                },
             ],
         ),
     ]

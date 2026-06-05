@@ -48,7 +48,7 @@ STACK_LAUNCH_FILES = {
 
 KNOWN_STACKS: FrozenSet[str] = frozenset(STACK_LAUNCH_FILES)
 VALID_LINES: FrozenSet[str] = frozenset({'centerline', 'racing'})
-VALID_TRACKS: FrozenSet[str] = frozenset({'circuit', 'oval'})
+VALID_TRACKS: FrozenSet[str] = frozenset({'circuit', 'oval', 'f1_circuit'})
 
 LAP_TIMEOUT_S = 600.0
 SIM_COOLDOWN_S = 5.0
@@ -168,7 +168,7 @@ def normalize_run(raw: dict, default_warmup_laps: int) -> BenchmarkRun:
 
     track = str(raw.get('track', 'circuit'))
     if track not in VALID_TRACKS:
-        sys.exit(f'unknown track {track!r}; use circuit or oval')
+        sys.exit(f'unknown track {track!r}; use circuit, oval, or f1_circuit')
 
     line = str(raw.get('line', 'centerline'))
     if line not in VALID_LINES:
