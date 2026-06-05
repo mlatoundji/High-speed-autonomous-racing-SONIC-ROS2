@@ -1,7 +1,8 @@
 # Crash NaN / reset à l'origine — analyse de cause racine
 
 > Statut : **cause racine confirmée par le code**. Correctif : paramètre
-> `obstacle_avoidance` (défaut `true` = comportement d'origine).
+> `obstacle_avoidance`, **défaut `false`** (évitement désactivé = suivi de racing
+> line). Mettre `true` pour réactiver l'évitement.
 
 ## Symptôme
 
@@ -107,13 +108,13 @@ même quand le contrôle prend du retard → pas de NaN.
 
 ## Correctif appliqué
 
-1. **Paramètre `obstacle_avoidance`** dans `localplanner.py`
-   (défaut `True` = comportement d'origine). Quand `False`, `path_is_blocked`
-   renvoie `False` → la voiture suit toujours la racing line (offset 0) → plus
-   de crawl, plus de déviation brutale → **le déclencheur du NaN disparaît**.
-
-2. **`obstacle_avoidance: false`** dans le bloc `local_planner` du YAML de
-   benchmark (`scripts/configs/r5_pp_racing_speed_soft.yaml`).
+1. **Paramètre `obstacle_avoidance`** dans `localplanner.py`, **défaut `False`**.
+   Quand `False`, `path_is_blocked` renvoie `False` → la voiture suit toujours la
+   racing line (offset 0) → plus de crawl, plus de déviation brutale → **le
+   déclencheur du NaN disparaît**. Le défaut étant `false`, **toutes les configs
+   en bénéficient automatiquement** (pas besoin de le mettre par config). Mettre
+   `obstacle_avoidance: true` dans le bloc `local_planner` pour réactiver
+   l'évitement sur une config donnée.
 
 ### Le LiDAR devient‑il inutile ?
 

@@ -39,7 +39,7 @@ path_tracker:
         lookahead_max: 6.0
         closest_search_ahead: 120
         steering_limits: 0.95
-        steering_rate_limit: 0.0
+        steering_rate_limit: 4.0  # cap steering slew (was 0.0=unlimited): prevents violent saw/oscillation -> physics shock/NaN on tight tracks
         steer_smoothing: 1.0
         velocity_gain: 1.0
         startup_ramp_s: 2.0

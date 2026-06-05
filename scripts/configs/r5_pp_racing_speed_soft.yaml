@@ -27,7 +27,6 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
-        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.0
@@ -83,7 +82,6 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
-        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 7.5  # TUNED (baseline 8.0)
@@ -139,7 +137,6 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
-        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.5  # TUNED (baseline 8.0)
@@ -195,7 +192,6 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
-        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.0
@@ -251,7 +247,6 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
-        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.0
