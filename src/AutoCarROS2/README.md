@@ -80,20 +80,23 @@ $ ros2 launch launches default_launch.py
 # Launch the interactive launch file
 $ ros2 launch launches click_launch.py
 
-# Stanley race stack (line:=centerline or line:=racing)
-$ colcon build --packages-select autocar_racing_line autocar_nav launches --symlink-install
+# Stanley race stack (track:=circuit|oval, line:=centerline|racing)
+$ colcon build --packages-select autocar_gazebo autocar_racing_line autocar_nav launches --symlink-install
 $ source install/setup.bash
 $ ros2 launch launches race_launch.py line:=centerline
 $ ros2 launch launches race_launch.py line:=racing
+$ ros2 launch launches race_launch.py track:=oval line:=centerline
 $ ros2 launch launches race_launch.py line:=racing latency_ms:=200 profile:=default odom_noise_std:=0.0
 
 # MPC race stack
-$ colcon build --packages-select autocar_racing_line autocar_nav autocar_nav_mpc launches --symlink-install
+$ colcon build --packages-select autocar_gazebo autocar_racing_line autocar_nav autocar_nav_mpc launches --symlink-install
 $ ros2 launch launches race_mpc_launch.py line:=racing
+$ ros2 launch launches race_mpc_launch.py track:=oval line:=centerline
 
 # Pure Pursuit race stack
-$ colcon build --packages-select autocar_racing_line autocar_nav autocar_nav_pure_pursuit launches --symlink-install
+$ colcon build --packages-select autocar_gazebo autocar_racing_line autocar_nav autocar_nav_pure_pursuit launches --symlink-install
 $ ros2 launch launches race_pure_pursuit_launch.py line:=racing
+$ ros2 launch launches race_pure_pursuit_launch.py track:=oval line:=centerline
 
 # Automated benchmarks (from repo root, after colcon build)
 $ python3 scripts/benchmark.py --smoke

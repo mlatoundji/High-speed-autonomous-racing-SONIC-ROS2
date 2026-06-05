@@ -117,6 +117,8 @@ From repo root after `colcon build`:
 ```bash
 ros2 launch launches race_pure_pursuit_launch.py line:=centerline
 ros2 launch launches race_pure_pursuit_launch.py line:=racing
+ros2 launch launches race_pure_pursuit_launch.py track:=oval line:=centerline
+ros2 launch launches race_pure_pursuit_launch.py track:=oval line:=racing
 ```
 
 Batch (vs Stanley): `python3 scripts/benchmark.py --config scripts/configs/r1_pp_vs_stanley.yaml`

@@ -48,6 +48,7 @@ STACK_LAUNCH_FILES = {
 
 KNOWN_STACKS: FrozenSet[str] = frozenset(STACK_LAUNCH_FILES)
 VALID_LINES: FrozenSet[str] = frozenset({'centerline', 'racing'})
+VALID_TRACKS: FrozenSet[str] = frozenset({'circuit', 'oval'})
 
 LAP_TIMEOUT_S = 600.0
 SIM_COOLDOWN_S = 5.0
@@ -58,6 +59,7 @@ _STALE_SIM_PROCS = ('gzserver', 'gzclient', 'rviz2')
 SMOKE_RUN = {
     'stack': 'stanley',
     'profile': 'default',
+    'track': 'circuit',
     'line': 'centerline',
     'latency_ms': 0,
     'odom_noise_std': 0.0,
@@ -95,6 +97,7 @@ def resolve_config_path(config_path: Path) -> Path:
 class BenchmarkRun:
     stack: str
     profile: str
+    track: str
     line: str
     latency_ms: int
     odom_noise_std: float
@@ -106,6 +109,7 @@ class BenchmarkRun:
         d = {
             'stack': self.stack,
             'profile': self.profile,
+            'track': self.track,
             'line': self.line,
             'latency_ms': self.latency_ms,
             'odom_noise_std': self.odom_noise_std,
@@ -160,6 +164,10 @@ def normalize_run(raw: dict, default_warmup_laps: int) -> BenchmarkRun:
     if warmup_laps != requested_warmup:
         _log(f'warmup_laps capped from {requested_warmup} to {warmup_laps} (lap_count={lap_count})')
 
+    track = str(raw.get('track', 'circuit'))
+    if track not in VALID_TRACKS:
+        sys.exit(f'unknown track {track!r}; use circuit or oval')
+
     line = str(raw.get('line', 'centerline'))
     if line not in VALID_LINES:
         sys.exit(f'unknown line {line!r}; use centerline or racing')
@@ -181,6 +189,7 @@ def normalize_run(raw: dict, default_warmup_laps: int) -> BenchmarkRun:
     return BenchmarkRun(
         stack=stack,
         profile=str(raw.get('profile', 'default')),
+        track=track,
         line=line,
         latency_ms=int(raw.get('latency_ms', 0)),
         odom_noise_std=float(raw.get('odom_noise_std', 0.0)),
@@ -388,6 +397,7 @@ def build_launch_command(run: BenchmarkRun) -> str:
         'source install/setup.bash && '
         f'ros2 launch launches {launch_file} '
         f'profile:={run.profile} '
+        f'track:={run.track} '
         f'line:={run.line} '
         f'latency_ms:={run.latency_ms} '
         f'odom_noise_std:={run.odom_noise_std}'
@@ -493,6 +503,7 @@ def summarize_results(results: list) -> list:
         summary = {
             'stack': run.stack,
             'profile': run.profile,
+            'track': run.track,
             'line': run.line,
             'latency_ms': run.latency_ms,
             'odom_noise_std': run.odom_noise_std,

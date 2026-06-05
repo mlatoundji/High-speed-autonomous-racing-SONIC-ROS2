@@ -153,6 +153,10 @@ def main():
     xs, ys = read_waypoints(args.input)
     n = len(xs)
     print(f'Loaded {n} centerline waypoints from {args.input}')
+    closed_with_duplicate = (
+        n >= 3 and
+        np.hypot(xs[0] - xs[-1], ys[0] - ys[-1]) < 1e-6
+    )
 
     _, _, nx_l, ny_l = closed_tangent_normal(xs, ys)
     kappa = closed_curvature(xs, ys)
@@ -171,9 +175,10 @@ def main():
     new_xs = xs + offset * nx_l
     new_ys = ys + offset * ny_l
 
-    # Close the loop so lap wrap does not confuse planners (centerline repeats wp 0).
-    new_xs[-1] = new_xs[0]
-    new_ys[-1] = new_ys[0]
+    # Preserve file style: only force repeated endpoint when input already has it.
+    if closed_with_duplicate:
+        new_xs[-1] = new_xs[0]
+        new_ys[-1] = new_ys[0]
 
     write_waypoints(args.output, new_xs, new_ys)
     print(f'Wrote {n} racing-line waypoints to {args.output}')
@@ -199,10 +204,12 @@ def main():
         nxs_c = np.append(new_xs, new_xs[0])
         nys_c = np.append(new_ys, new_ys[0])
 
+        center_label = f'Centerline ({args.input.name})'
+        racing_label = f'Racing line ({args.output.name})'
         fig, ax = plt.subplots(figsize=(10, 10))
-        ax.plot(xs_c, ys_c, 'b.-', label='Centerline (waypoints.csv)',
+        ax.plot(xs_c, ys_c, 'b.-', label=center_label,
                 alpha=0.7, markersize=5, linewidth=1.2)
-        ax.plot(nxs_c, nys_c, 'r.-', label='Racing line (waypoints_racing.csv)',
+        ax.plot(nxs_c, nys_c, 'r.-', label=racing_label,
                 alpha=0.85, markersize=5, linewidth=1.2)
         edge_l_x = xs + TRACK_HALF_WIDTH_M * nx_l
         edge_l_y = ys + TRACK_HALF_WIDTH_M * ny_l

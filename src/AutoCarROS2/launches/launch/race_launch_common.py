@@ -14,10 +14,25 @@ from repo_results import lap_timer_parameters
 
 INJECTOR_PKG = 'autocar_nav'
 
-WAYPOINTS_FILES = {
-    'centerline': 'waypoints.csv',
-    'racing': 'waypoints_racing.csv',
+RACE_TRACKS = {
+    'circuit': {
+        'world': 'race_circuit.world',
+        'waypoints': {
+            'centerline': 'waypoints.csv',
+            'racing': 'waypoints_racing.csv',
+        },
+    },
+    'oval': {
+        'world': 'race_oval.world',
+        'waypoints': {
+            'centerline': 'waypoints_oval.csv',
+            'racing': 'waypoints_oval_racing.csv',
+        },
+    },
 }
+
+# Back-compat alias for code that only maps line -> filename on the circuit track.
+WAYPOINTS_FILES = RACE_TRACKS['circuit']['waypoints']
 
 
 def experiment_launch_arguments():
@@ -41,7 +56,39 @@ def experiment_launch_arguments():
     ]
 
 
-def race_launch_arguments(default_world):
+def resolve_track(track: str) -> dict:
+    if track not in RACE_TRACKS:
+        raise RuntimeError(
+            f'Unknown track {track!r}; use one of: {sorted(RACE_TRACKS)}')
+    return RACE_TRACKS[track]
+
+
+def resolve_world_path(track: str) -> str:
+    gzpkg = 'autocar_gazebo'
+    cfg = resolve_track(track)
+    return os.path.join(
+        get_package_share_directory(gzpkg), 'worlds', cfg['world'])
+
+
+def resolve_waypoints_file(track: str, line: str) -> str:
+    cfg = resolve_track(track)
+    if line not in cfg['waypoints']:
+        raise RuntimeError(
+            f'Unknown line {line!r} for track {track!r}; '
+            f'use one of: {sorted(cfg["waypoints"])}')
+    return cfg['waypoints'][line]
+
+
+def world_path_from_context(context) -> str:
+    """Gazebo world file: explicit ``world`` launch arg, else from ``track``."""
+    world_override = LaunchConfiguration('world').perform(context).strip()
+    if world_override:
+        return world_override
+    track = LaunchConfiguration('track').perform(context)
+    return resolve_world_path(track)
+
+
+def race_launch_arguments(default_track='circuit'):
     """Common launch args for race simulations."""
     return [
         DeclareLaunchArgument(
@@ -60,14 +107,19 @@ def race_launch_arguments(default_world):
             description='Launch RViz if true.',
         ),
         DeclareLaunchArgument(
+            'track',
+            default_value=default_track,
+            description='Race layout: circuit (round) or oval (ellipse, same lap length).',
+        ),
+        DeclareLaunchArgument(
             'world',
-            default_value=default_world,
-            description='Gazebo world file to launch.',
+            default_value='',
+            description='Gazebo world file path (empty = world for ``track``).',
         ),
         DeclareLaunchArgument(
             'line',
             default_value='centerline',
-            description='Waypoint track: centerline or racing.',
+            description='Waypoint line: centerline or racing.',
         ),
         DeclareLaunchArgument(
             'control_mode',
@@ -91,13 +143,14 @@ def race_launch_arguments(default_world):
     ]
 
 
-def simulation_nodes(default_world):
+def simulation_nodes(context):
     """Return Gazebo, robot_state_publisher and RViz actions."""
     descpkg = 'autocar_description'
     rviz = os.path.join(
         get_package_share_directory(descpkg), 'rviz', 'view.rviz')
     urdf = os.path.join(
         get_package_share_directory(descpkg), 'urdf', 'autocar.xacro')
+    world = world_path_from_context(context)
 
     use_sim_time = LaunchConfiguration('use_sim_time')
 
@@ -111,7 +164,7 @@ def simulation_nodes(default_world):
             cmd=[
                 'gzserver',
                 '--verbose',
-                LaunchConfiguration('world', default=default_world),
+                world,
                 '-s',
                 'libgazebo_ros_init.so',
                 '-s',
@@ -140,33 +193,24 @@ def simulation_nodes(default_world):
     ]
 
 
-def race_launch_description(navpkg, stack, navconfig, world_name='race_circuit.world'):
+def race_launch_description(navpkg, stack, navconfig, default_track='circuit'):
     """Build a full race launch description for one navigation stack."""
-    gzpkg = 'autocar_gazebo'
-    default_world = os.path.join(
-        get_package_share_directory(gzpkg), 'worlds', world_name)
 
-    def _nav_setup(context, *args, **kwargs):
-        return navigation_nodes(context, navpkg, stack, navconfig)
+    def _race_setup(context, *args, **kwargs):
+        return simulation_nodes(context) + navigation_nodes(
+            context, navpkg, stack, navconfig)
 
     return LaunchDescription([
-        *race_launch_arguments(default_world),
-        *simulation_nodes(default_world),
-        OpaqueFunction(function=_nav_setup),
+        *race_launch_arguments(default_track),
+        OpaqueFunction(function=_race_setup),
     ])
 
 
-def resolve_waypoints_file(line: str) -> str:
-    if line not in WAYPOINTS_FILES:
-        raise RuntimeError(
-            f'Unknown line {line!r}; use one of: {sorted(WAYPOINTS_FILES)}')
-    return WAYPOINTS_FILES[line]
-
-
 def navigation_nodes(context, navpkg, stack, navconfig):
-    """Return nav stack nodes with ``line`` applied to global_planner and lap_timer."""
+    """Return nav stack nodes with ``track`` / ``line`` applied to global_planner."""
+    track = LaunchConfiguration('track').perform(context)
     line = LaunchConfiguration('line').perform(context)
-    waypoints_file = resolve_waypoints_file(line)
+    waypoints_file = resolve_waypoints_file(track, line)
     use_sim_time = LaunchConfiguration('use_sim_time')
     profile = LaunchConfiguration('profile').perform(context)
     latency_ms = int(LaunchConfiguration('latency_ms').perform(context))

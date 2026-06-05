@@ -13,6 +13,7 @@ install(DIRECTORY data
 
 install(PROGRAMS
   scripts/generate_racing_line.py
+  scripts/generate_oval_waypoints.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
