@@ -42,6 +42,23 @@ def generate_launch_description():
     rviz = os.path.join(
         get_package_share_directory(descpkg), 'rviz', 'view.rviz')
 
+    # Optional: drop the heavy third-person camera sensor (1280x720 @ 30 Hz,
+    # rendered by gzserver) to cut CPU load and raise the real-time factor.
+    # `camera:=false` strips it from a temp copy of the world; default keeps it.
+    camera = next((a.split(':=', 1)[1] for a in sys.argv if a.startswith('camera:=')), 'true')
+    if camera.lower() in ('false', '0', 'no'):
+        import re
+        import tempfile
+        sdf = open(world).read()
+        sdf = re.sub(r'\n\s*<joint name="third_person_camera_joint".*?</joint>',
+                     '', sdf, flags=re.DOTALL)
+        sdf = re.sub(r'\n\s*<link name="third_person_camera_link">.*?</link>',
+                     '', sdf, flags=re.DOTALL)
+        tmp = tempfile.NamedTemporaryFile('w', suffix='_nocam.world', delete=False)
+        tmp.write(sdf)
+        tmp.close()
+        world = tmp.name
+
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
 
     subprocess.run(['killall', 'gzserver'], check=False)
@@ -63,6 +80,13 @@ def generate_launch_description():
             'use_sim_time',
             default_value='true',
             description='Use simulation (Gazebo) clock if true.',
+        ),
+        DeclareLaunchArgument(
+            'camera',
+            default_value='true',
+            description='Render the third-person camera sensor. '
+                        'Set false for cheaper sim (higher RTF) while still '
+                        'showing the car in Gazebo.',
         ),
         DeclareLaunchArgument(
             'line',

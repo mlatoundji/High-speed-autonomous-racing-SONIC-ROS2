@@ -85,6 +85,14 @@ class LocalPathPlanner(Node):
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
 
+        # Optional: when false, skip the LiDAR/occupancy wall-avoidance and always
+        # follow the racing line (offset 0). On an empty track the /map marks the
+        # track walls as occupied (see bof.cpp), so the avoidance blocks all lateral
+        # offsets on curves -> crawl, then a sudden large deviation -> sharp steering
+        # -> NaN. Default true keeps the original behaviour.
+        self.declare_parameter('obstacle_avoidance', True)
+        self.obstacle_avoidance = bool(self.get_parameter('obstacle_avoidance').value)
+
         self.ds = 1.0 / self.frequency
 
         self.target_vel = self.cruise_vel
@@ -162,6 +170,8 @@ class LocalPathPlanner(Node):
         return None
 
     def path_is_blocked(self, cx, cy):
+        if not self.obstacle_avoidance:
+            return False
         if self.grid is None or self.grid_info is None:
             return False
 

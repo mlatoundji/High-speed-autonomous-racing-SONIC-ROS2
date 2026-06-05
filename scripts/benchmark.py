@@ -101,6 +101,7 @@ class BenchmarkRun:
     lap_count: int
     warmup_laps: int
     nav_config: Optional[str] = None
+    camera: bool = True
 
     def as_dict(self) -> dict:
         d = {
@@ -111,6 +112,7 @@ class BenchmarkRun:
             'odom_noise_std': self.odom_noise_std,
             'lap_count': self.lap_count,
             'warmup_laps': self.warmup_laps,
+            'camera': self.camera,
         }
         if self.nav_config is not None:
             d['nav_config'] = self.nav_config
@@ -187,6 +189,7 @@ def normalize_run(raw: dict, default_warmup_laps: int) -> BenchmarkRun:
         lap_count=lap_count,
         warmup_laps=warmup_laps,
         nav_config=nav_config,
+        camera=bool(raw.get('camera', True)),
     )
 
 
@@ -390,7 +393,8 @@ def build_launch_command(run: BenchmarkRun) -> str:
         f'profile:={run.profile} '
         f'line:={run.line} '
         f'latency_ms:={run.latency_ms} '
-        f'odom_noise_std:={run.odom_noise_std}'
+        f'odom_noise_std:={run.odom_noise_std} '
+        f'camera:={str(run.camera).lower()}'
     )
     if run.stack == 'pure_pursuit' and run.nav_config:
         nav = run.nav_config
