@@ -17,6 +17,7 @@
   odom_noise_std: 0.0
   lap_count: 2
   warmup_laps: 1
+  camera: false  # drop third-person camera sensor (CPU saving); set true to see it in Gazebo
   navigation:
     # Baseline: full r3_pp_racing_optional reference; no TUNED keys in this profile.
     localisation:
@@ -26,6 +27,7 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
+        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.0
@@ -56,7 +58,7 @@
         lookahead_max: 6.0
         closest_search_ahead: 120
         steering_limits: 0.95
-        steering_rate_limit: 0.0
+        steering_rate_limit: 4.0  # capped (was 0.0=unlimited): avoids instant steering snaps -> Gazebo physics shock -> NaN/reset
         steer_smoothing: 1.0
         velocity_gain: 1.0
         startup_ramp_s: 2.0
@@ -70,6 +72,7 @@
   odom_noise_std: 0.0
   lap_count: 2
   warmup_laps: 1
+  camera: false  # drop third-person camera sensor (CPU saving); set true to see it in Gazebo
   navigation:
     # Deltas vs r5_sp_baseline: local_planner cruise/avoid velocity, max_lateral_accel only.
     # --- frozen (same as baseline): localisation, global_planner, path_tracker ---
@@ -80,6 +83,7 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
+        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 7.5  # TUNED (baseline 8.0)
@@ -110,7 +114,7 @@
         lookahead_max: 6.0
         closest_search_ahead: 120
         steering_limits: 0.95
-        steering_rate_limit: 0.0
+        steering_rate_limit: 4.0  # capped (was 0.0=unlimited): avoids instant steering snaps -> Gazebo physics shock -> NaN/reset
         steer_smoothing: 1.0
         velocity_gain: 1.0
         startup_ramp_s: 2.0
@@ -124,6 +128,7 @@
   odom_noise_std: 0.0
   lap_count: 2
   warmup_laps: 1
+  camera: false  # drop third-person camera sensor (CPU saving); set true to see it in Gazebo
   navigation:
     # Deltas vs r5_sp_baseline: local_planner cruise/avoid velocity, max_lateral_accel only.
     # --- frozen (same as baseline): localisation, global_planner, path_tracker ---
@@ -134,6 +139,7 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
+        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.5  # TUNED (baseline 8.0)
@@ -164,7 +170,7 @@
         lookahead_max: 6.0
         closest_search_ahead: 120
         steering_limits: 0.95
-        steering_rate_limit: 0.0
+        steering_rate_limit: 4.0  # capped (was 0.0=unlimited): avoids instant steering snaps -> Gazebo physics shock -> NaN/reset
         steer_smoothing: 1.0
         velocity_gain: 1.0
         startup_ramp_s: 2.0
@@ -178,6 +184,7 @@
   odom_noise_std: 0.0
   lap_count: 2
   warmup_laps: 1
+  camera: false  # drop third-person camera sensor (CPU saving); set true to see it in Gazebo
   navigation:
     # Deltas vs r5_sp_baseline: path_tracker lateral_soft, heading_soft only.
     # --- frozen (same as baseline): localisation, local_planner, global_planner ---
@@ -188,6 +195,7 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
+        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.0
@@ -218,7 +226,7 @@
         lookahead_max: 6.0
         closest_search_ahead: 120
         steering_limits: 0.95
-        steering_rate_limit: 0.0
+        steering_rate_limit: 4.0  # capped (was 0.0=unlimited): avoids instant steering snaps -> Gazebo physics shock -> NaN/reset
         steer_smoothing: 1.0
         velocity_gain: 1.0
         startup_ramp_s: 2.0
@@ -232,6 +240,7 @@
   odom_noise_std: 0.0
   lap_count: 2
   warmup_laps: 1
+  camera: false  # drop third-person camera sensor (CPU saving); set true to see it in Gazebo
   navigation:
     # Deltas vs r5_sp_baseline: local_planner accel_rate, decel_rate; path_tracker lateral_soft, heading_soft.
     # --- frozen: every key below unless it has a # TUNED comment ---
@@ -242,6 +251,7 @@
       ros__parameters:
         update_frequency: 10.0
         car_width: 2.0
+        obstacle_avoidance: false  # follow racing line, skip LiDAR wall-avoidance (see docs/nan_crash_root_cause.md)
         centreofgravity_to_frontaxle: 1.483
         frame_id: "base_link"
         cruise_velocity: 8.0
@@ -272,7 +282,7 @@
         lookahead_max: 6.0
         closest_search_ahead: 120
         steering_limits: 0.95
-        steering_rate_limit: 0.0
+        steering_rate_limit: 4.0  # capped (was 0.0=unlimited): avoids instant steering snaps -> Gazebo physics shock -> NaN/reset
         steer_smoothing: 1.0
         velocity_gain: 1.0
         startup_ramp_s: 2.0

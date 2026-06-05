@@ -1,6 +1,8 @@
 """Shared helpers for race stack launch files (centerline / racing line)."""
 
 import os
+import re
+import tempfile
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -88,6 +90,31 @@ def world_path_from_context(context) -> str:
     return resolve_world_path(track)
 
 
+def _world_without_camera(world_path: str) -> str:
+    """Return a temp world SDF with the third-person camera sensor stripped."""
+    with open(world_path) as f:
+        sdf = f.read()
+    sdf = re.sub(
+        r'\n\s*<joint name="third_person_camera_joint".*?</joint>',
+        '', sdf, flags=re.DOTALL)
+    sdf = re.sub(
+        r'\n\s*<link name="third_person_camera_link">.*?</link>',
+        '', sdf, flags=re.DOTALL)
+    tmp = tempfile.NamedTemporaryFile('w', suffix='_nocam.world', delete=False)
+    tmp.write(sdf)
+    tmp.close()
+    return tmp.name
+
+
+def simulation_world_path(context) -> str:
+    """Resolve world path, optionally stripping the third-person camera sensor."""
+    world = world_path_from_context(context)
+    camera = LaunchConfiguration('camera').perform(context).strip().lower()
+    if camera in ('false', '0', 'no'):
+        return _world_without_camera(world)
+    return world
+
+
 def race_launch_arguments(default_track='circuit'):
     """Common launch args for race simulations."""
     return [
@@ -135,6 +162,13 @@ def race_launch_arguments(default_track='circuit'):
             ),
         ),
         DeclareLaunchArgument(
+            'camera',
+            default_value='true',
+            description='Render the third-person camera sensor. '
+                        'Set false for cheaper sim (higher RTF) while still '
+                        'showing the car in Gazebo.',
+        ),
+        DeclareLaunchArgument(
             'camera_mode',
             default_value='follow',
             description='Preferred camera mode: free, top, or follow.',
@@ -150,7 +184,7 @@ def simulation_nodes(context):
         get_package_share_directory(descpkg), 'rviz', 'view.rviz')
     urdf = os.path.join(
         get_package_share_directory(descpkg), 'urdf', 'autocar.xacro')
-    world = world_path_from_context(context)
+    world = simulation_world_path(context)
 
     use_sim_time = LaunchConfiguration('use_sim_time')
 

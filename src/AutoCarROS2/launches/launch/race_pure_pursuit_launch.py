@@ -6,7 +6,6 @@ _LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
 if _LAUNCH_DIR not in sys.path:
     sys.path.insert(0, _LAUNCH_DIR)
 from race_launch_common import (  # noqa: E402
-    experiment_launch_arguments,
     navigation_nodes,
     race_launch_arguments,
     simulation_nodes,
