@@ -72,8 +72,8 @@ results/*
 !results/benchmark_2026-05-23T16-28-02/**
 !results/benchmark_2026-05-25T19-37-58/
 !results/benchmark_2026-05-25T19-37-58/**
-!results/pp_racing_line_2026-05-23/
-!results/pp_racing_line_2026-05-23/**
+!results/benchmark_2026-06-08T19-47-00/
+!results/benchmark_2026-06-08T19-47-00/**
 !results/mpc_2026-05-25T16-46-36/
 !results/mpc_2026-05-25T16-46-36/**
 !results/mpc_racing_2026-05-25T16-56-47/
@@ -82,8 +82,12 @@ results/*
 !results/pure_pursuit_2026-05-25T16-28-02/**
 !results/pure_pursuit_2026-05-25T19-48-04/
 !results/pure_pursuit_2026-05-25T19-48-04/**
+!results/pure_pursuit_2026-06-08T19-47-06/
+!results/pure_pursuit_2026-06-08T19-47-06/**
 !results/pure_pursuit_racing_2026-05-25T16-34-12/
 !results/pure_pursuit_racing_2026-05-25T16-34-12/**
+!results/pure_pursuit_racing_2026-06-08T20-00-46/
+!results/pure_pursuit_racing_2026-06-08T20-00-46/**
 !results/stanley_2026-05-25T13-55-37/
 !results/stanley_2026-05-25T13-55-37/**
 !results/stanley_2026-05-25T19-37-58/

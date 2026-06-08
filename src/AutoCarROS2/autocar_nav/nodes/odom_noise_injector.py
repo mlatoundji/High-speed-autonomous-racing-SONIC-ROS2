@@ -49,7 +49,6 @@ class OdomNoiseInjector(Node):
             return
 
         out = State2D()
-        out.header = msg.header
         out.pose.x = msg.pose.x + random.gauss(0.0, self.odom_noise_std)
         out.pose.y = msg.pose.y + random.gauss(0.0, self.odom_noise_std)
         out.pose.theta = msg.pose.theta + random.gauss(0.0, self.odom_noise_std)
