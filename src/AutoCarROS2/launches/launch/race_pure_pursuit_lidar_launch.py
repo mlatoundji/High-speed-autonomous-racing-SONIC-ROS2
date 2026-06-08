@@ -33,9 +33,16 @@ def generate_launch_description():
     subprocess.run(['killall', 'gzserver'], check=False)
     subprocess.run(['killall', 'gzclient'], check=False)
 
+    view_slam = os.path.join(
+        get_package_share_directory('autocar_description'),
+        'rviz', 'view_slam.rviz')
+
     return LaunchDescription([
         *race_launch_arguments(
-            default_track='f1_circuit_fenced', default_line='racing'),
+            default_track='f1_circuit_fenced',
+            default_line='racing',
+            default_rviz_config=view_slam,
+        ),
         DeclareLaunchArgument(
             'nav_config',
             default_value='',

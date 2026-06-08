@@ -11,7 +11,7 @@ from typing import Iterable
 
 import numpy as np
 
-from autocar_nav_pure_pursuit.pure_pursuit import forward_vector, right_vector
+from autocar_nav_pure_pursuit_lidar.pure_pursuit import forward_vector, right_vector
 
 # SLAM / nav_msgs: treat likely-occupied cells as walls (unknown is -1).
 OCCUPIED = 50
@@ -135,6 +135,39 @@ def _lateral_ray_to_boundary(
     return None
 
 
+def corridor_geometry_from_map(
+        grid: np.ndarray,
+        info,
+        x: float,
+        y: float,
+        tangent_psi: float) -> tuple[float, float, float, float]:
+    """Geometric corridor sample: midpoint and left/right clearances (m) from the grid.
+
+    ``tangent_psi`` is the path tangent angle (not body yaw). Rays are cast
+    perpendicular to this heading.
+    """
+    body_yaw = tangent_psi - math.pi / 2
+    left_x, left_y = _left_vector(body_yaw)
+
+    left_d = _lateral_ray_to_boundary(grid, info, x, y, left_x, left_y)
+    right_d = _lateral_ray_to_boundary(grid, info, x, y, -left_x, -left_y)
+
+    if left_d is not None and right_d is not None:
+        offset = (left_d - right_d) * 0.5
+        return (
+            x + offset * left_x,
+            y + offset * left_y,
+            float(left_d),
+            float(right_d),
+        )
+
+    if left_d is not None:
+        return x, y, float(left_d), TRACK_HALF_WIDTH
+    if right_d is not None:
+        return x, y, TRACK_HALF_WIDTH, float(right_d)
+    return x, y, TRACK_HALF_WIDTH, TRACK_HALF_WIDTH
+
+
 def centerline_from_map(
         grid: np.ndarray,
         info,
@@ -142,27 +175,21 @@ def centerline_from_map(
         y: float,
         yaw: float,
         forward_distances: Iterable[float]) -> list[tuple[float, float]]:
-    """Sample corridor midpoints using lateral ray casts on the BOF grid."""
+    """Sample corridor midpoints using lateral ray casts on the occupancy grid."""
     fwd_x, fwd_y = forward_vector(yaw)
-    left_x, left_y = _left_vector(yaw)
+    tangent_psi = math.atan2(fwd_y, fwd_x)
 
     points: list[tuple[float, float]] = []
     for d in forward_distances:
         cx = x + d * fwd_x
         cy = y + d * fwd_y
-        left_d = _lateral_ray_to_boundary(grid, info, cx, cy, left_x, left_y)
-        right_d = _lateral_ray_to_boundary(grid, info, cx, cy, -left_x, -left_y)
-        if left_d is not None and right_d is not None:
+        mx, my, left_d, right_d = corridor_geometry_from_map(
+            grid, info, cx, cy, tangent_psi)
+        if left_d < TRACK_HALF_WIDTH or right_d < TRACK_HALF_WIDTH:
             offset = _lateral_center_offset(left_d, right_d)
-            points.append((cx + offset * left_x, cy + offset * left_y))
-        elif left_d is not None:
-            offset = (left_d - TRACK_HALF_WIDTH) * 0.5
-            points.append((cx + offset * left_x, cy + offset * left_y))
-        elif right_d is not None:
-            offset = -(right_d - TRACK_HALF_WIDTH) * 0.5
-            points.append((cx + offset * left_x, cy + offset * left_y))
-        else:
-            points.append((cx, cy))
+            mx = cx + offset * _left_vector(yaw)[0]
+            my = cy + offset * _left_vector(yaw)[1]
+        points.append((mx, my))
     return points
 
 

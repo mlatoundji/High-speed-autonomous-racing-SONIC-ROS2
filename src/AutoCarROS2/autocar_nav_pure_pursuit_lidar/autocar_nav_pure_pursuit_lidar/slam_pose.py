@@ -6,7 +6,7 @@ import math
 
 from geometry_msgs.msg import TransformStamped
 
-from autocar_nav_pure_pursuit.normalise_angle import normalise_angle
+from autocar_nav_pure_pursuit_lidar.normalise_angle import normalise_angle
 
 
 def _yaw_from_quat(x: float, y: float, z: float, w: float) -> float:
@@ -40,3 +40,16 @@ def slam_pose_in_map(map_to_base: TransformStamped) -> tuple[float, float, float
     """Return base_link pose expressed in the SLAM map frame."""
     x, y, yaw = _transform_to_2d(map_to_base)
     return x, y, normalise_angle(yaw)
+
+
+def map_point_to_odom(
+        px: float,
+        py: float,
+        map_to_odom: TransformStamped) -> tuple[float, float]:
+    """Transform a map-frame point into the fixed odom frame."""
+    ox, oy, oyaw = _transform_to_2d(map_to_odom)
+    dx = px - ox
+    dy = py - oy
+    c = math.cos(oyaw)
+    s = math.sin(oyaw)
+    return c * dx + s * dy, -s * dx + c * dy

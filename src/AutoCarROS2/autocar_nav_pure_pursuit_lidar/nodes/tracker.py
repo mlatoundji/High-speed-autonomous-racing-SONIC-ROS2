@@ -16,7 +16,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float64
 
 from autocar_msgs.msg import Path2D, State2D
-from autocar_nav_pure_pursuit.pure_pursuit import (
+from autocar_nav_pure_pursuit_lidar.pure_pursuit import (
     anchor_path_index,
     closest_path_index,
     dynamic_lookahead,
@@ -31,7 +31,7 @@ from autocar_nav_pure_pursuit.pure_pursuit import (
     smooth_steering,
     speed_scale_from_errors,
 )
-from autocar_nav_pure_pursuit.yaw_to_quaternion import yaw_to_quaternion
+from autocar_nav_pure_pursuit_lidar.yaw_to_quaternion import yaw_to_quaternion
 
 STARTUP_RAMP_S = 2.0
 

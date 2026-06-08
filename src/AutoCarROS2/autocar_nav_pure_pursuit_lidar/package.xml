@@ -16,11 +16,7 @@
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
-  <exec_depend>python3-pandas</exec_depend>
-
   <depend>autocar_msgs</depend>
-  <exec_depend>autocar_nav_pure_pursuit</exec_depend>
-  <exec_depend>autocar_racing_line</exec_depend>
   <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
 

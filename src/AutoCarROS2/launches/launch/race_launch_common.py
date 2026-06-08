@@ -166,7 +166,10 @@ def simulation_world_path(context) -> str:
     return world
 
 
-def race_launch_arguments(default_track='circuit', default_line='centerline'):
+def race_launch_arguments(
+        default_track='circuit',
+        default_line='centerline',
+        default_rviz_config=''):
     """Common launch args for race simulations."""
     return [
         DeclareLaunchArgument(
@@ -183,6 +186,11 @@ def race_launch_arguments(default_track='circuit', default_line='centerline'):
             'rviz',
             default_value='true',
             description='Launch RViz if true.',
+        ),
+        DeclareLaunchArgument(
+            'rviz_config',
+            default_value=default_rviz_config,
+            description='RViz config file (empty = autocar_description/rviz/view.rviz).',
         ),
         DeclareLaunchArgument(
             'track',
@@ -231,8 +239,12 @@ def race_launch_arguments(default_track='circuit', default_line='centerline'):
 def simulation_nodes(context):
     """Return Gazebo, robot_state_publisher and RViz actions."""
     descpkg = 'autocar_description'
-    rviz = os.path.join(
-        get_package_share_directory(descpkg), 'rviz', 'view.rviz')
+    rviz_override = LaunchConfiguration('rviz_config').perform(context).strip()
+    if rviz_override:
+        rviz = rviz_override
+    else:
+        rviz = os.path.join(
+            get_package_share_directory(descpkg), 'rviz', 'view.rviz')
     urdf = os.path.join(
         get_package_share_directory(descpkg), 'urdf', 'autocar.xacro')
     world = simulation_world_path(context)
@@ -393,10 +405,9 @@ def navigation_nodes(context, navpkg, stack, navconfig):
 
 
 def navigation_nodes_lidar(context, navpkg, stack, navconfig):
-    """LiDAR hybrid stack: lap-1 SLAM exploration, lap-2+ SLAM pose + racing line."""
+    """LiDAR hybrid stack: lap-1 SLAM exploration, lap-2+ min-curvature line from SLAM map."""
     track = LaunchConfiguration('track').perform(context)
     line = LaunchConfiguration('line').perform(context)
-    waypoints_file = resolve_waypoints_file(track, line)
     use_sim_time = LaunchConfiguration('use_sim_time')
     profile = LaunchConfiguration('profile').perform(context)
     latency_ms = int(LaunchConfiguration('latency_ms').perform(context))
@@ -409,7 +420,7 @@ def navigation_nodes_lidar(context, navpkg, stack, navconfig):
 
     base_params = [navconfig, {'use_sim_time': use_sim_time}]
     injector_params = {'use_sim_time': use_sim_time}
-    planner_params = base_params + [{'waypoints_file': waypoints_file}]
+    planner_params = base_params
 
     tracker_remappings = (
         [] if use_control_manager

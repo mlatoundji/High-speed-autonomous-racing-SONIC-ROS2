@@ -9,8 +9,9 @@ from rclpy.node import Node
 from std_msgs.msg import Float64, Int32
 
 from autocar_msgs.msg import Path2D, State2D
-from autocar_nav_pure_pursuit import generate_cubic_path, yaw_to_quaternion
-from autocar_nav_pure_pursuit.pure_pursuit import (
+from autocar_nav_pure_pursuit_lidar.cubic_spline_interpolator import generate_cubic_path
+from autocar_nav_pure_pursuit_lidar.yaw_to_quaternion import yaw_to_quaternion
+from autocar_nav_pure_pursuit_lidar.pure_pursuit import (
     anchor_path_index,
     apply_speed_ramp,
     closest_path_index,
@@ -44,7 +45,7 @@ class LocalPathPlanner(Node):
             ('centreofgravity_to_frontaxle', 1.483),
             ('cruise_velocity', 6.0),
             ('avoid_velocity', 6.0),
-            ('exploration_velocity', 4.0),
+            ('exploration_velocity', 3.0),
             ('max_lateral_accel', 4.5),
             ('min_curvature', 0.012),
             ('curvature_lookahead', 140),

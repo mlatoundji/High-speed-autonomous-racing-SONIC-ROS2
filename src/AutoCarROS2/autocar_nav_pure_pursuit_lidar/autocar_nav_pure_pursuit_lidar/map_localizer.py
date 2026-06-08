@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from autocar_nav_pure_pursuit_lidar.pure_pursuit import forward_vector
+
 OCCUPIED = 50
 
 
@@ -84,8 +86,6 @@ def scan_match_pose(
         xy_step: float = 0.25,
         yaw_step: float = 0.02) -> PoseCorrection:
     """Brute-force 3-DOF scan matching on a static track map."""
-    from autocar_nav_pure_pursuit.pure_pursuit import forward_vector
-
     fwd_x, fwd_y = forward_vector(yaw)
     lidar_x = x + cg_to_lidar * fwd_x
     lidar_y = y + cg_to_lidar * fwd_y

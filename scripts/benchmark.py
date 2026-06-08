@@ -6,9 +6,10 @@ Examples:
     python3 scripts/benchmark.py --config scripts/configs/r4_latency_sweep.yaml
     python3 scripts/benchmark.py --config r4_latency_sweep.yaml --dry-run
 
-Pure Pursuit runs may include inline ``navigation:`` (full ROS parameter YAML)
-or ``nav_config:`` (repo-relative path to a YAML file); see
-``scripts/configs/r3_pp_racing_optional.yaml``.
+Pure Pursuit / Pure Pursuit LiDAR runs may include inline ``navigation:`` (full
+ROS parameter YAML) or ``nav_config:`` (repo-relative path to a YAML file); see
+``scripts/configs/r3_pp_racing_optional.yaml`` and
+``scripts/configs/f1_pure_pursuit_lidar.yaml``.
 """
 
 from __future__ import annotations
@@ -420,7 +421,7 @@ def build_launch_command(run: BenchmarkRun) -> str:
         f'odom_noise_std:={run.odom_noise_std} '
         f'camera:={str(run.camera).lower()}'
     )
-    if run.stack == 'pure_pursuit' and run.nav_config:
+    if run.stack in ('pure_pursuit', 'pure_pursuit_lidar') and run.nav_config:
         nav = run.nav_config
         nav_arg = shlex.quote(nav) if any(c in nav for c in ' \t\n') else nav
         cmd += f' nav_config:={nav_arg}'

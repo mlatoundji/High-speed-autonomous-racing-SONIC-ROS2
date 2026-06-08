@@ -11,7 +11,7 @@ from rclpy.node import Node
 from tf2_ros import Buffer, TransformListener
 
 from autocar_msgs.msg import State2D
-from autocar_nav_pure_pursuit.normalise_angle import normalise_angle
+from autocar_nav_pure_pursuit_lidar.normalise_angle import normalise_angle
 from autocar_nav_pure_pursuit_lidar.slam_pose import slam_pose_in_odom
 
 
