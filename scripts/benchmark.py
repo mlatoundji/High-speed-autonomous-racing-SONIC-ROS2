@@ -44,6 +44,7 @@ STACK_LAUNCH_FILES = {
     'stanley': 'race_launch.py',
     'mpc': 'race_mpc_launch.py',
     'pure_pursuit': 'race_pure_pursuit_launch.py',
+    'pure_pursuit_lidar': 'race_pure_pursuit_lidar_launch.py',
 }
 
 KNOWN_STACKS: FrozenSet[str] = frozenset(STACK_LAUNCH_FILES)

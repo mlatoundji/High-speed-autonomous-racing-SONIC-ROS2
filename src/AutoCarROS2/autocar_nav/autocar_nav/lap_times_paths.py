@@ -20,7 +20,7 @@ REPORT_BASELINE_NAME = 'REPORT_BASELINE.md'
 RUN_LAP_TIMES_NAME = 'lap_times.csv'
 RUN_PARAMS_NAME = 'params.yaml'
 
-KNOWN_STACKS = frozenset({'stanley', 'mpc', 'pure_pursuit'})
+KNOWN_STACKS = frozenset({'stanley', 'mpc', 'pure_pursuit', 'pure_pursuit_lidar'})
 
 LAP_TIMES_LEGACY_FIELDS = (
     'session_id',

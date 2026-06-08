@@ -22,7 +22,12 @@ from rclpy.node import Node
 from std_msgs.msg import Float64, Int32
 
 from autocar_msgs.msg import State2D
-from autocar_nav.lap_times_paths import LAP_TIMES_CSV_FIELDS, init_lap_times_csv, lap_log_paths
+from autocar_nav.lap_times_paths import (
+    KNOWN_STACKS,
+    LAP_TIMES_CSV_FIELDS,
+    init_lap_times_csv,
+    lap_log_paths,
+)
 
 
 CSV_FIELDS = list(LAP_TIMES_CSV_FIELDS)
@@ -87,7 +92,7 @@ class LapTimer(Node):
         if not self._csv_targets:
             raise RuntimeError(
                 f'lap_timer: unknown stack {self.stack!r} or missing run_dir. '
-                f'Use one of: stanley, mpc, pure_pursuit.')
+                f'Use one of: {sorted(KNOWN_STACKS)}.')
 
         self.session_id = run_id or datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         for path in self._csv_targets:

@@ -13,9 +13,14 @@ import re
 from pathlib import Path
 
 HALF_WIDTH = 8.0
+# Drop bollards that fold onto the asphalt at tight corners (min dist to any
+# centerline sample must stay near the nominal edge offset).
+MIN_EDGE_DIST = HALF_WIDTH - 0.5
 # LiDAR scan plane is at z=0.72 m; keep top slightly above for pitch margin.
 POST_HEIGHT = 0.80
 POST_RADIUS = 0.20
+# Place every Nth waypoint to reduce clutter while keeping edge coverage.
+BOLLARD_STRIDE = 2
 
 MAT = (
     '<material><ambient>0.35 0.08 0.02 1</ambient>'
@@ -73,6 +78,23 @@ def offset_edge(
     return out
 
 
+def _min_dist_to_polyline(px: float, py: float, centerline: list[tuple[float, float]]) -> float:
+    return min(math.hypot(px - cx, py - cy) for cx, cy in centerline)
+
+
+def _filter_edge_posts(
+        edge_pts: list[tuple[float, float]],
+        centerline: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Keep only bollards that remain outside the drivable corridor."""
+    kept: list[tuple[float, float]] = []
+    for i, (x, y) in enumerate(edge_pts):
+        if i % BOLLARD_STRIDE != 0:
+            continue
+        if _min_dist_to_polyline(x, y, centerline) >= MIN_EDGE_DIST:
+            kept.append((x, y))
+    return kept
+
+
 def cylinder_post(name: str, x: float, y: float) -> str:
     z = POST_HEIGHT / 2
     r, h = POST_RADIUS, POST_HEIGHT
@@ -104,8 +126,8 @@ def build_fenced_world(src_text: str) -> str:
         raise ValueError('no <road name="track"> waypoints found in source world')
 
     area = signed_area(points)
-    inner = offset_edge(points, 'inner', area)
-    outer = offset_edge(points, 'outer', area)
+    inner = _filter_edge_posts(offset_edge(points, 'inner', area), points)
+    outer = _filter_edge_posts(offset_edge(points, 'outer', area), points)
 
     bollard_xml = f"""
     <!-- ===== Cylinder bollards along inner/outer track edges ({HALF_WIDTH:.0f} m offset, LiDAR-visible) ===== -->
@@ -139,7 +161,8 @@ def main() -> None:
     args.dst.write_text(dst_text)
     inner_count = dst_text.split('track_inner_bollards')[1].split('track_outer_bollards')[0].count('<link name="post_')
     outer_count = dst_text.split('track_outer_bollards')[1].count('<link name="post_')
-    print(f'Wrote {args.dst} (inner={inner_count}, outer={outer_count} cylinders)')
+    print(f'Wrote {args.dst} (inner={inner_count}, outer={outer_count} cylinders, '
+          f'stride={BOLLARD_STRIDE}, min_edge={MIN_EDGE_DIST}m)')
 
 
 if __name__ == '__main__':

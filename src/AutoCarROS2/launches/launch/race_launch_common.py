@@ -166,7 +166,7 @@ def simulation_world_path(context) -> str:
     return world
 
 
-def race_launch_arguments(default_track='circuit'):
+def race_launch_arguments(default_track='circuit', default_line='centerline'):
     """Common launch args for race simulations."""
     return [
         DeclareLaunchArgument(
@@ -196,8 +196,8 @@ def race_launch_arguments(default_track='circuit'):
         ),
         DeclareLaunchArgument(
             'line',
-            default_value='centerline',
-            description='Waypoint line: centerline or racing.',
+            default_value=default_line,
+            description='Waypoint line: centerline or racing (lap 2+ for LiDAR stack).',
         ),
         DeclareLaunchArgument(
             'control_mode',
@@ -362,6 +362,108 @@ def navigation_nodes(context, navpkg, stack, navconfig):
         Node(
             package=navpkg, name='path_tracker', executable='tracker.py',
             parameters=[navconfig, {'use_sim_time': use_sim_time}],
+            remappings=tracker_remappings,
+        ),
+        Node(
+            package='autocar_nav', name='viz_status',
+            executable='viz_status.py',
+            parameters=[{'use_sim_time': use_sim_time}],
+            condition=IfCondition(LaunchConfiguration('use_control_manager')),
+        ),
+        Node(
+            package='autocar_nav',
+            name='lap_timer',
+            executable='lap_timer.py',
+            parameters=[
+                {
+                    **lap_timer_parameters(
+                        stack,
+                        use_sim_time,
+                        navconfig,
+                        line=line,
+                        profile=profile,
+                        latency_ms=latency_ms,
+                        odom_noise_std=odom_noise_std,
+                    ),
+                    **resolve_lap_timer_params(track),
+                },
+            ],
+        ),
+    ]
+
+
+def navigation_nodes_lidar(context, navpkg, stack, navconfig):
+    """LiDAR hybrid stack: lap-1 map centerline, lap-2+ map localization + racing line."""
+    track = LaunchConfiguration('track').perform(context)
+    line = LaunchConfiguration('line').perform(context)
+    waypoints_file = resolve_waypoints_file(track, line)
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    profile = LaunchConfiguration('profile').perform(context)
+    latency_ms = int(LaunchConfiguration('latency_ms').perform(context))
+    odom_noise_std = float(LaunchConfiguration('odom_noise_std').perform(context))
+    initial_mode = LaunchConfiguration('control_mode').perform(context)
+    use_control_manager = LaunchConfiguration('use_control_manager').perform(
+        context).strip().lower() in ('true', '1', 'yes')
+    mappkg = 'autocar_map'
+
+    base_params = [navconfig, {'use_sim_time': use_sim_time}]
+    injector_params = {'use_sim_time': use_sim_time}
+    planner_params = base_params + [{'waypoints_file': waypoints_file}]
+
+    tracker_remappings = (
+        [] if use_control_manager
+        else [('/autocar/auto_cmd_vel', '/autocar/cmd_vel')]
+    )
+
+    return [
+        Node(
+            package=navpkg, name='localisation', executable='localisation.py',
+            parameters=base_params,
+            remappings=[('/autocar/state2D', '/autocar/state2D_raw')],
+        ),
+        Node(
+            package=INJECTOR_PKG, name='latency_injector',
+            executable='latency_injector.py',
+            parameters=[injector_params, {
+                'latency_ms': ParameterValue(latency_ms, value_type=int),
+            }],
+        ),
+        Node(
+            package=INJECTOR_PKG, name='odom_noise_injector',
+            executable='odom_noise_injector.py',
+            parameters=[injector_params, {
+                'odom_noise_std': ParameterValue(odom_noise_std, value_type=float),
+            }],
+        ),
+        Node(
+            package=navpkg, name='global_planner_lidar',
+            executable='global_planner_lidar.py',
+            parameters=planner_params,
+        ),
+        Node(
+            package=navpkg, name='local_planner', executable='localplanner.py',
+            parameters=base_params,
+        ),
+        Node(
+            package=navpkg, name='map_saver', executable='map_saver.py',
+            parameters=base_params,
+        ),
+        Node(
+            package=mappkg, name='bof', executable='bof',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
+        Node(
+            package='autocar_nav', name='control_manager',
+            executable='control_manager.py',
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'initial_mode': initial_mode,
+            }],
+            condition=IfCondition(LaunchConfiguration('use_control_manager')),
+        ),
+        Node(
+            package=navpkg, name='path_tracker', executable='tracker.py',
+            parameters=base_params,
             remappings=tracker_remappings,
         ),
         Node(
