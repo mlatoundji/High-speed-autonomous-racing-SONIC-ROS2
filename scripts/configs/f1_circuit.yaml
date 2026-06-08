@@ -55,6 +55,7 @@
         lookahead_gain: 0.3   # 0.5 visait trop loin -> coupait les virages serrés -> sortie de route. 0.3 = propre (112.5s). Zigzag mineur a regler autrement.
         lookahead_min: 1.0    # F1 (défaut 1.5): plus court -> tracking plus serré
         lookahead_max: 6.0
+        lookahead_curv_extra: 3.0   # lookahead adaptatif: +3m en ligne droite (anti-zigzag), ~0 en virage (suivi serre). 0 = off.
         closest_search_ahead: 120
         steering_limits: 0.95
         steering_rate_limit: 4.0  # anti-oscillation (cf. défaut); écrête le saw de braquage
