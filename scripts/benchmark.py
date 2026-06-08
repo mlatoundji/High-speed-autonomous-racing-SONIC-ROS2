@@ -51,10 +51,27 @@ VALID_LINES: FrozenSet[str] = frozenset({'centerline', 'racing'})
 VALID_TRACKS: FrozenSet[str] = frozenset({'circuit', 'oval', 'f1_circuit'})
 
 LAP_TIMEOUT_S = 600.0
-SIM_COOLDOWN_S = 5.0
 LAUNCH_SHUTDOWN_TIMEOUT_S = 20.0
-STALE_SIM_TERM_WAIT_S = 3.0
-_STALE_SIM_PROCS = ('gzserver', 'gzclient', 'rviz2')
+_HARD_RESET_PGREP_PATTERNS = (
+    'ros2 launch',
+    'tracker.py',
+    'localplanner.py',
+    'globalplanner.py',
+    'localisation.py',
+    'lap_timer.py',
+    'latency_injector.py',
+    'control_manager.py',
+    'bof',
+    'odom_noise',
+)
+_HARD_RESET_KILLALL = (
+    'gzserver',
+    'gzclient',
+    'gazebo',
+    'robot_state_publisher',
+    'rviz2',
+    'bof',
+)
 
 SMOKE_RUN = {
     'stack': 'stanley',
@@ -286,13 +303,34 @@ def write_benchmark_config(
 # Simulation runner
 # ---------------------------------------------------------------------------
 
-def _sim_process_running(name: str) -> bool:
-    result = subprocess.run(
-        ['pgrep', '-x', name],
+def _run_quiet(cmd: list) -> None:
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def hard_reset_ros_sim() -> None:
+    """Kill orphaned ROS/Gazebo processes and restart the ROS 2 daemon.
+
+    Same sequence as the manual reset documented in README.md (``pkill`` /
+    ``killall`` / ``ros2 daemon stop|start``).
+    """
+    _log('hard reset between runs (ROS/Gazebo cleanup)')
+    for pattern in _HARD_RESET_PGREP_PATTERNS:
+        _run_quiet(['pkill', '-9', '-f', pattern])
+    for name in _HARD_RESET_KILLALL:
+        _run_quiet(['killall', '-9', name])
+
+    ros_distro = os.environ.get('ROS_DISTRO', 'humble')
+    subprocess.run(
+        [
+            'bash', '-lc',
+            f'source /opt/ros/{ros_distro}/setup.bash && '
+            'ros2 daemon stop; sleep 3; '
+            'ros2 daemon stop; sleep 2; '
+            'ros2 daemon start',
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    return result.returncode == 0
 
 
 def terminate_launch_process(proc: subprocess.Popen) -> None:
@@ -329,34 +367,6 @@ def terminate_launch_process(proc: subprocess.Popen) -> None:
             proc.wait(timeout=5)
         except (ProcessLookupError, subprocess.TimeoutExpired):
             pass
-
-
-def cleanup_stale_sim_processes() -> None:
-    """Remove orphaned Gazebo / RViz after launch exit.
-
-    Uses SIGTERM first so the next ``ros2 launch`` (which also killall's gz)
-    does not fight frozen ``-9`` windows. SIGKILL only if still alive.
-    """
-    for name in _STALE_SIM_PROCS:
-        if not _sim_process_running(name):
-            continue
-        subprocess.run(
-            ['killall', name],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    time.sleep(STALE_SIM_TERM_WAIT_S)
-
-    for name in _STALE_SIM_PROCS:
-        if not _sim_process_running(name):
-            continue
-        _log(f'{name} still running; sending SIGKILL')
-        subprocess.run(
-            ['killall', '-9', name],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
 
 
 def run_dir_prefix(run: BenchmarkRun) -> str:
@@ -414,11 +424,6 @@ def build_launch_command(run: BenchmarkRun) -> str:
 
 
 def execute_run(run: BenchmarkRun, results_root: Path) -> dict:
-    if any(_sim_process_running(name) for name in _STALE_SIM_PROCS):
-        _log('stale Gazebo/RViz detected before launch; cleaning up')
-        cleanup_stale_sim_processes()
-        time.sleep(SIM_COOLDOWN_S)
-
     dirs_before = list_run_dir_names(results_root)
     expected_laps = run.lap_count
     deadline = time.time() + LAP_TIMEOUT_S * expected_laps
@@ -463,8 +468,7 @@ def execute_run(run: BenchmarkRun, results_root: Path) -> dict:
             break
 
     terminate_launch_process(proc)
-    cleanup_stale_sim_processes()
-    time.sleep(SIM_COOLDOWN_S)
+    hard_reset_ros_sim()
 
     rows = []
     session_id = None
@@ -493,16 +497,55 @@ def _float_field(row: dict, key: str, default: float = 0.0) -> float:
     return float(value)
 
 
+def _lap_metric_summary(rows: list) -> dict:
+    """Aggregate post-warmup lap rows.
+
+    ``duration_s`` is summarized as ``median_lap_s`` / ``std_lap_s`` / … to
+    avoid duplicating the same lap-time columns under the raw field name.
+    """
+    durations = [
+        _float_field(x, 'duration_s')
+        for x in rows
+        if x.get('duration_s')
+    ]
+    empty = {
+        'median_lap_s': None,
+        'std_lap_s': None,
+        'min_lap_s': None,
+        'max_lap_s': None,
+        'median_avg_speed_mps': None,
+        'max_speed_mps': None,
+        'median_distance_m': None,
+        'median_lateral_error_rms': None,
+        'max_lateral_error_max': None,
+        'offtrack_events_total': None,
+    }
+    if not durations:
+        return empty
+    return {
+        'median_lap_s': statistics.median(durations),
+        'std_lap_s': statistics.stdev(durations) if len(durations) > 1 else 0.0,
+        'min_lap_s': min(durations),
+        'max_lap_s': max(durations),
+        'median_avg_speed_mps': statistics.median(
+            _float_field(x, 'avg_speed_mps') for x in rows),
+        'max_speed_mps': max(_float_field(x, 'max_speed_mps') for x in rows),
+        'median_distance_m': statistics.median(
+            _float_field(x, 'distance_m') for x in rows),
+        'median_lateral_error_rms': statistics.median(
+            _float_field(x, 'lateral_error_rms') for x in rows),
+        'max_lateral_error_max': max(
+            _float_field(x, 'lateral_error_max') for x in rows),
+        'offtrack_events_total': sum(
+            int(_float_field(x, 'offtrack_events')) for x in rows),
+    }
+
+
 def summarize_results(results: list) -> list:
     table = []
     for entry in results:
         run = entry['run']
         rows = entry['rows'][run.warmup_laps:]
-        durations = [
-            _float_field(x, 'duration_s')
-            for x in rows
-            if x.get('duration_s')
-        ]
 
         summary = {
             'stack': run.stack,
@@ -520,29 +563,7 @@ def summarize_results(results: list) -> list:
             'laps_measured': len(rows),
             'timed_out': entry['timed_out'],
         }
-        if durations:
-            summary.update({
-                'median_lap_s': statistics.median(durations),
-                'std_lap_s': statistics.stdev(durations) if len(durations) > 1 else 0.0,
-                'min_lap_s': min(durations),
-                'max_lap_s': max(durations),
-                'median_lateral_error_rms': statistics.median(
-                    _float_field(x, 'lateral_error_rms') for x in rows),
-                'max_lateral_error_max': max(
-                    _float_field(x, 'lateral_error_max') for x in rows),
-                'offtrack_events_total': sum(
-                    int(_float_field(x, 'offtrack_events')) for x in rows),
-            })
-        else:
-            summary.update({
-                'median_lap_s': None,
-                'std_lap_s': None,
-                'min_lap_s': None,
-                'max_lap_s': None,
-                'median_lateral_error_rms': None,
-                'max_lateral_error_max': None,
-                'offtrack_events_total': None,
-            })
+        summary.update(_lap_metric_summary(rows))
         table.append(summary)
     return table
 
@@ -714,6 +735,7 @@ def main(argv: Optional[list] = None) -> None:
 
     _log(f'output={out_dir}')
     _log(f'config: {config_path}')
+    hard_reset_ros_sim()
     t0 = time.time()
     results = []
     for i, run in enumerate(runs, 1):
