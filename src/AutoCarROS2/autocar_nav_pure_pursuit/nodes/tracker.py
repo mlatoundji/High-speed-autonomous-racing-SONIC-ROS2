@@ -25,6 +25,7 @@ from autocar_nav_pure_pursuit.pure_pursuit import (
     front_axle_pose,
     lateral_error_front_axle,
     limit_steering_rate,
+    lookahead_curvature_scale,
     pure_pursuit_steering,
     rear_axle_pose,
     smooth_steering,
@@ -94,6 +95,17 @@ class PurePursuitTracker(Node):
 
         except ValueError:
             raise Exception('Missing ROS parameters. Check the configuration file.')
+
+        # Curvature-adaptive lookahead (opt-in). Adds up to lookahead_curv_extra m
+        # to the lookahead on STRAIGHTS (curvature scale ~1) and ~0 in sharp bends
+        # (scale ~0): smooths straight-line zigzag WITHOUT lengthening the lookahead
+        # in corners (so no corner-cutting / lap-time cost). 0.0 = off (default).
+        self.declare_parameter('lookahead_curv_extra', 0.0)
+        self.ld_curv_extra = float(self.get_parameter('lookahead_curv_extra').value)
+        self.declare_parameter('lookahead_curv_soft', 0.08)
+        self.ld_curv_soft = float(self.get_parameter('lookahead_curv_soft').value)
+        self.declare_parameter('lookahead_curv_window', 30)
+        self.ld_curv_window = int(self.get_parameter('lookahead_curv_window').value)
 
         self.x = None
         self.y = None
@@ -215,6 +227,17 @@ class PurePursuitTracker(Node):
 
         # Measured speed sets lookahead (natural damping at the current pace).
         ld = dynamic_lookahead(vel, self.ld_gain, self.ld_min, self.ld_max)
+
+        # Curvature-adaptive: lengthen lookahead on straights (anti-zigzag), keep it
+        # short in bends (tight tracking). Opt-in via lookahead_curv_extra (> 0).
+        if self.ld_curv_extra > 0.0:
+            end = min(len(path_yaw), closest_idx + self.ld_curv_window)
+            if end - closest_idx >= 2:
+                yw = np.unwrap(np.asarray(path_yaw[closest_idx:end], dtype=float))
+                ds = np.hypot(np.diff(np.asarray(cx[closest_idx:end])),
+                              np.diff(np.asarray(cy[closest_idx:end])))
+                kpk = float(np.max(np.abs(np.diff(yw)) / np.maximum(ds, 1e-3)))
+                ld += self.ld_curv_extra * lookahead_curvature_scale(kpk, self.ld_curv_soft)
 
         la_idx, tx, ty = find_lookahead_point(
             rx, ry, cx, cy, closest_idx, ld)
