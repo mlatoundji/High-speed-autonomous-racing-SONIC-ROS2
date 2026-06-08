@@ -1,4 +1,4 @@
-"""Extract a short local centerline from LiDAR and/or BOF occupancy map.
+"""Extract a short local centerline from LiDAR and/or SLAM occupancy map.
 
 Lap-1 exploration uses corridor midpoints between detected track boundaries
 (inner/outer bollards or walls) ahead of the vehicle.
@@ -13,7 +13,7 @@ import numpy as np
 
 from autocar_nav_pure_pursuit.pure_pursuit import forward_vector, right_vector
 
-# BOF unknown cells are exactly 50; only count confirmed obstacles.
+# SLAM / nav_msgs: treat likely-occupied cells as walls (unknown is -1).
 OCCUPIED = 50
 RAY_STEP = 0.25
 LIDAR_MOUNT_YAW = math.pi / 2  # hokuyo_link yaw relative to base_link
@@ -211,7 +211,10 @@ def extract_local_centerline(
         scan_range_min: float = 0.12,
         scan_range_max: float = 30.0,
         grid: np.ndarray | None = None,
-        grid_info=None) -> list[tuple[float, float]]:
+        grid_info=None,
+        map_x: float | None = None,
+        map_y: float | None = None,
+        map_yaw: float | None = None) -> list[tuple[float, float]]:
     """Fuse scan-based and map-based corridor centerline (scan preferred on lap 1)."""
     distances = [goal_step * (i + 1) for i in range(goal_count)]
 
@@ -224,7 +227,10 @@ def extract_local_centerline(
             return pts
 
     if grid is not None and grid_info is not None:
-        pts = centerline_from_map(grid, grid_info, x, y, yaw, distances)
+        gx = map_x if map_x is not None else x
+        gy = map_y if map_y is not None else y
+        gyaw = map_yaw if map_yaw is not None else yaw
+        pts = centerline_from_map(grid, grid_info, gx, gy, gyaw, distances)
         if len(pts) >= 2:
             return pts
 

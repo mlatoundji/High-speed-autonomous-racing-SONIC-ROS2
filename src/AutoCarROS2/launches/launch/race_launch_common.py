@@ -393,7 +393,7 @@ def navigation_nodes(context, navpkg, stack, navconfig):
 
 
 def navigation_nodes_lidar(context, navpkg, stack, navconfig):
-    """LiDAR hybrid stack: lap-1 map centerline, lap-2+ map localization + racing line."""
+    """LiDAR hybrid stack: lap-1 SLAM exploration, lap-2+ SLAM pose + racing line."""
     track = LaunchConfiguration('track').perform(context)
     line = LaunchConfiguration('line').perform(context)
     waypoints_file = resolve_waypoints_file(track, line)
@@ -404,7 +404,8 @@ def navigation_nodes_lidar(context, navpkg, stack, navconfig):
     initial_mode = LaunchConfiguration('control_mode').perform(context)
     use_control_manager = LaunchConfiguration('use_control_manager').perform(
         context).strip().lower() in ('true', '1', 'yes')
-    mappkg = 'autocar_map'
+    slam_config = os.path.join(
+        get_package_share_directory(navpkg), 'config', 'slam_toolbox.yaml')
 
     base_params = [navconfig, {'use_sim_time': use_sim_time}]
     injector_params = {'use_sim_time': use_sim_time}
@@ -445,12 +446,10 @@ def navigation_nodes_lidar(context, navpkg, stack, navconfig):
             parameters=base_params,
         ),
         Node(
-            package=navpkg, name='map_saver', executable='map_saver.py',
-            parameters=base_params,
-        ),
-        Node(
-            package=mappkg, name='bof', executable='bof',
-            parameters=[{'use_sim_time': use_sim_time}],
+            package='slam_toolbox',
+            name='slam_toolbox',
+            executable='async_slam_toolbox_node',
+            parameters=[slam_config, {'use_sim_time': use_sim_time}],
         ),
         Node(
             package='autocar_nav', name='control_manager',

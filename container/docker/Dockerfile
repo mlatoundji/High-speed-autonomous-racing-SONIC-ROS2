@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     ros-foxy-gazebo-ros-pkgs \
     ros-foxy-joint-state-publisher \
+    ros-foxy-slam-toolbox \
     ros-foxy-vision-msgs \
     websockify \
     x11vnc \

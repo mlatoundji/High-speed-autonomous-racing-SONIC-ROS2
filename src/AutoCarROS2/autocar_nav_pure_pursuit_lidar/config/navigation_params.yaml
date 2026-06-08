@@ -1,7 +1,7 @@
 localisation:
     ros__parameters:
         update_frequency: 50.0
-        cg_to_lidar: 2.4
+        use_slam: true
 
 local_planner:
     ros__parameters:
@@ -30,15 +30,6 @@ global_planner_lidar:
         exploration_goal_count: 10
         exploration_goal_step: 3.0
         cg_to_lidar: 2.4
-        map_localize_search_xy: 1.0
-        map_localize_search_yaw: 0.08
-        map_localize_xy_step: 0.25
-        map_localize_yaw_step: 0.02
-        map_save_path: ""
-
-map_saver:
-    ros__parameters:
-        map_save_path: ""
 
 path_tracker:
     ros__parameters:

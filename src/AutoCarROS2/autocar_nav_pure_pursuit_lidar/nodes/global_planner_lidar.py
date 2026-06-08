@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Hybrid global planner: lap-1 LiDAR centerline, lap-2+ map-localized racing line."""
+"""Hybrid global planner: lap-1 LiDAR centerline, lap-2+ SLAM pose + racing line."""
 
 import os
-import pickle
 
 import numpy as np
 import pandas as pd
@@ -11,10 +10,12 @@ from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Pose, Pose2D, PoseArray
 from nav_msgs.msg import OccupancyGrid
 from rcl_interfaces.msg import ParameterDescriptor
+from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Int32
+from tf2_ros import Buffer, TransformListener
 
 from autocar_msgs.msg import Path2D, State2D
 from autocar_nav_pure_pursuit.pure_pursuit import (
@@ -22,7 +23,7 @@ from autocar_nav_pure_pursuit.pure_pursuit import (
     forward_vector,
 )
 from autocar_nav_pure_pursuit_lidar.centerline_extractor import extract_local_centerline
-from autocar_nav_pure_pursuit_lidar.map_localizer import scan_match_pose
+from autocar_nav_pure_pursuit_lidar.slam_pose import slam_pose_in_map
 
 
 class GlobalPlannerLidar(Node):
@@ -32,7 +33,6 @@ class GlobalPlannerLidar(Node):
 
         self.goals_pub = self.create_publisher(Path2D, '/autocar/goals', 10)
         self.goals_viz_pub = self.create_publisher(PoseArray, '/autocar/viz_goals', 10)
-        self.corr_pub = self.create_publisher(Pose2D, '/autocar/pose_correction', 10)
         self.mode_pub = self.create_publisher(Int32, '/autocar/nav_mode', 10)
 
         self.state_sub = self.create_subscription(
@@ -60,11 +60,6 @@ class GlobalPlannerLidar(Node):
             ('exploration_goal_count', 10),
             ('exploration_goal_step', 4.0),
             ('cg_to_lidar', 2.4),
-            ('map_localize_search_xy', 1.0),
-            ('map_localize_search_yaw', 0.08),
-            ('map_localize_xy_step', 0.25),
-            ('map_localize_yaw_step', 0.02),
-            ('map_save_path', ''),
         ])
 
         self.wp_ahead = int(self.get_parameter('waypoints_ahead').value)
@@ -75,13 +70,8 @@ class GlobalPlannerLidar(Node):
         self.goal_count = int(self.get_parameter('exploration_goal_count').value)
         self.goal_step = float(self.get_parameter('exploration_goal_step').value)
         self.cg2lidar = float(self.get_parameter('cg_to_lidar').value)
-        self.loc_search_xy = float(self.get_parameter('map_localize_search_xy').value)
-        self.loc_search_yaw = float(self.get_parameter('map_localize_search_yaw').value)
-        self.loc_xy_step = float(self.get_parameter('map_localize_xy_step').value)
-        self.loc_yaw_step = float(self.get_parameter('map_localize_yaw_step').value)
 
         self._load_racing_line()
-        self._load_saved_map()
 
         self.lap_count = 0
         self.x = None
@@ -92,17 +82,13 @@ class GlobalPlannerLidar(Node):
 
         self.live_grid = None
         self.live_grid_info = None
+        self.map_frame_id = 'map'
         self.scan = None
 
-        self.timer = self.create_timer(0.1, self.timer_cb)
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
 
-    def _map_path(self) -> str:
-        path = str(self.get_parameter('map_save_path').value).strip()
-        if path:
-            return path
-        return os.path.join(
-            get_package_share_directory('autocar_nav_pure_pursuit_lidar'),
-            'data', 'track_map.pkl')
+        self.timer = self.create_timer(0.1, self.timer_cb)
 
     def _load_racing_line(self):
         waypoints_file = str(self.get_parameter('waypoints_file').value)
@@ -115,41 +101,15 @@ class GlobalPlannerLidar(Node):
         self.ry = np.asarray(df['Y-axis'].values, dtype=float)
         self.racing_n = min(len(self.rx), len(self.ry))
 
-    def _load_saved_map(self):
-        path = self._map_path()
-        self.saved_grid = None
-        self.saved_info = None
-        if not os.path.isfile(path):
-            self.get_logger().info(f'No saved track map yet: {path}')
-            return
-        with open(path, 'rb') as f:
-            payload = pickle.load(f)
-
-        class _Info:
-            pass
-
-        info = _Info()
-        info.resolution = payload['resolution']
-        info.width = payload['width']
-        info.height = payload['height']
-        info.origin = type('O', (), {'position': type('P', (), {
-            'x': payload['origin_x'],
-            'y': payload['origin_y'],
-        })()})()
-
-        self.saved_info = info
-        self.saved_grid = np.array(payload['data'], dtype=np.int8).reshape(
-            info.height, info.width)
-        self.get_logger().info(f'Loaded saved track map from {path}')
-
     def lap_cb(self, msg: Int32):
         if msg.data > self.lap_count:
             self.lap_count = msg.data
             if self.lap_count >= 1:
-                self._load_saved_map()
-                self.get_logger().info('Switching to RACING mode (map localization + racing line)')
+                self.get_logger().info(
+                    'Switching to RACING mode (SLAM pose + racing line)')
 
     def map_cb(self, msg: OccupancyGrid):
+        self.map_frame_id = msg.header.frame_id or 'map'
         self.live_grid_info = msg.info
         self.live_grid = np.array(msg.data, dtype=np.int8).reshape(
             msg.info.height, msg.info.width)
@@ -161,6 +121,16 @@ class GlobalPlannerLidar(Node):
         self.x = msg.pose.x
         self.y = msg.pose.y
         self.theta = msg.pose.theta
+
+    def _map_frame_pose(self) -> tuple[float, float, float] | None:
+        try:
+            stamp = rclpy.time.Time()
+            timeout = Duration(seconds=0.05)
+            map_to_base = self._tf_buffer.lookup_transform(
+                'map', 'base_link', stamp, timeout=timeout)
+        except Exception:
+            return None
+        return slam_pose_in_map(map_to_base)
 
     def timer_cb(self):
         if self.x is None:
@@ -174,28 +144,7 @@ class GlobalPlannerLidar(Node):
         else:
             mode_msg.data = 1  # racing
             self.mode_pub.publish(mode_msg)
-            self._publish_pose_correction()
             self._publish_racing_goals()
-
-    def _publish_pose_correction(self):
-        if self.scan is None or self.saved_grid is None:
-            return
-
-        ranges = np.asarray(self.scan.ranges, dtype=float)
-        corr = scan_match_pose(
-            self.saved_grid, self.saved_info,
-            self.x, self.y, self.theta, self.cg2lidar,
-            ranges,
-            self.scan.angle_min, self.scan.angle_increment,
-            self.scan.range_min, self.scan.range_max,
-            self.loc_search_xy, self.loc_search_yaw,
-            self.loc_xy_step, self.loc_yaw_step)
-
-        msg = Pose2D()
-        msg.x = corr.dx
-        msg.y = corr.dy
-        msg.theta = corr.dyaw
-        self.corr_pub.publish(msg)
 
     def _publish_exploration_goals(self):
         ranges = None
@@ -207,6 +156,12 @@ class GlobalPlannerLidar(Node):
             range_min = self.scan.range_min
             range_max = self.scan.range_max
 
+        map_pose = None
+        grid = self.live_grid
+        grid_info = self.live_grid_info
+        if grid is not None and self.map_frame_id == 'map':
+            map_pose = self._map_frame_pose()
+
         pts = extract_local_centerline(
             self.x, self.y, self.theta, self.cg2lidar,
             self.goal_step, self.goal_count,
@@ -215,16 +170,24 @@ class GlobalPlannerLidar(Node):
             scan_angle_increment=angle_inc,
             scan_range_min=range_min,
             scan_range_max=range_max,
-            grid=self.live_grid,
-            grid_info=self.live_grid_info,
+            grid=grid if map_pose is not None else None,
+            grid_info=grid_info if map_pose is not None else None,
+            map_x=map_pose[0] if map_pose else None,
+            map_y=map_pose[1] if map_pose else None,
+            map_yaw=map_pose[2] if map_pose else None,
         )
 
-        # Include a short segment behind the vehicle for spline continuity.
         fwd_x, fwd_y = forward_vector(self.theta)
         behind = [
             (self.x - self.goal_step * fwd_x, self.y - self.goal_step * fwd_y),
             (self.x, self.y),
         ]
+        if map_pose is not None and grid is not None:
+            mx, my, _ = map_pose
+            dx = self.x - mx
+            dy = self.y - my
+            pts = [(px + dx, py + dy) for px, py in pts]
+
         px = [p[0] for p in behind + pts]
         py = [p[1] for p in behind + pts]
         self._emit_goals(px, py, 'explore', force=True)

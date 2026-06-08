@@ -32,7 +32,6 @@ install(DIRECTORY
 install(PROGRAMS
   nodes/localisation.py
   nodes/global_planner_lidar.py
-  nodes/map_saver.py
   nodes/localplanner.py
   nodes/tracker.py
   DESTINATION lib/${PROJECT_NAME}

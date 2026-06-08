@@ -3,7 +3,7 @@
 <package format="3">
   <name>autocar_nav_pure_pursuit_lidar</name>
   <version>0.0.0</version>
-  <description>LiDAR-driven Pure Pursuit: lap-1 map exploration with local centerline, lap-2+ map localization and racing line</description>
+  <description>LiDAR-driven Pure Pursuit: lap-1 SLAM exploration, lap-2+ in-memory SLAM pose and racing line</description>
   <maintainer email="winston@todo.todo">winston</maintainer>
   <license>TODO: License declaration</license>
 
@@ -21,7 +21,8 @@
   <depend>autocar_msgs</depend>
   <exec_depend>autocar_nav_pure_pursuit</exec_depend>
   <exec_depend>autocar_racing_line</exec_depend>
-  <exec_depend>autocar_map</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
