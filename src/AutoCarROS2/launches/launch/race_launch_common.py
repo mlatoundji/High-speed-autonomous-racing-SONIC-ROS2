@@ -51,6 +51,13 @@ RACE_TRACKS = {
             'racing': 'waypoints_f1_racing.csv',
         },
     },
+    'f1_circuit_fenced': {
+        'world': 'race_f1_circuit_fenced.world',
+        'waypoints': {
+            'centerline': 'waypoints_f1.csv',
+            'racing': 'waypoints_f1_racing.csv',
+        },
+    },
 }
 
 # Back-compat alias for code that only maps line -> filename on the circuit track.
@@ -104,7 +111,7 @@ def resolve_waypoints_file(track: str, line: str) -> str:
 def resolve_lap_timer_params(track: str) -> dict:
     cfg = resolve_track(track)
     params = dict(cfg.get('lap_timer', {}))
-    if track == 'f1_circuit':
+    if track in ('f1_circuit', 'f1_circuit_fenced'):
         meta_path = os.path.join(
             get_package_share_directory('autocar_racing_line'),
             'data',
@@ -180,7 +187,7 @@ def race_launch_arguments(default_track='circuit'):
         DeclareLaunchArgument(
             'track',
             default_value=default_track,
-            description='Race layout: circuit, oval, or f1_circuit (Albert Park, 5.28 km).',
+            description='Race layout: circuit, oval, f1_circuit, or f1_circuit_fenced.',
         ),
         DeclareLaunchArgument(
             'world',
