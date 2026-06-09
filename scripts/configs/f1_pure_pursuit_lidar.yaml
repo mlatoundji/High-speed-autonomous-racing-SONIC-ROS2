@@ -6,6 +6,11 @@
 # ``results/benchmark_<ts>/nav_overrides/run_*.yaml`` and passes ``nav_config:=``
 # to ``race_pure_pursuit_lidar_launch.py``.
 #
+# Profils :
+#   baseline   — défaut navigation_params.yaml (cruise 6 m/s, curvature_lookahead 140)
+#   finetuned  — tuning vitesse lap 2+ (cruise 8 m/s, curvature_lookahead 60, lookahead F1)
+#   finetuned_perturbed — idem + latency_ms 200, odom_noise_std 0.1
+#
 #   python3 scripts/benchmark.py --config scripts/configs/f1_pure_pursuit_lidar.yaml
 #
 # Requires lap_count >= 2: lap 1 builds the SLAM map (exploration), lap 2+ races on
@@ -87,3 +92,159 @@
         startup_ramp_s: 2.0
         lateral_soft: 4.0
         heading_soft: 0.6
+
+- stack: pure_pursuit_lidar
+  profile: finetuned
+  track: f1_circuit_fenced
+  line: racing
+  latency_ms: 0
+  odom_noise_std: 0.0
+  lap_count: 2
+  warmup_laps: 1
+  camera: false
+  navigation:
+    localisation:
+      ros__parameters:
+        update_frequency: 50.0
+        use_slam: true
+
+    local_planner:
+      ros__parameters:
+        update_frequency: 10.0
+        car_width: 2.0
+        centreofgravity_to_frontaxle: 1.483
+        frame_id: "base_link"
+        cruise_velocity: 8.0          # baseline 6.0; plafond ~8 m/s sur F1 twisty (voir docs/rapport_optimisation_f1.md)
+        avoid_velocity: 8.0
+        exploration_velocity: 3.5     # lap 1 un peu plus rapide sans agresser le scan centerline
+        max_lateral_accel: 5.5        # baseline 4.5; autorise plus de vitesse en virage
+        min_curvature: 0.012
+        curvature_lookahead: 60       # baseline 140; freine plus tard sur circuit sinueux
+        curvature_smooth_window: 5
+        accel_rate: 5.0               # baseline 4.0; remonte plus vite vers v_cruise
+        decel_rate: 7.0               # baseline 6.0
+
+    global_planner_lidar:
+      ros__parameters:
+        waypoints_ahead: 5
+        waypoints_behind: 2
+        passed_threshold: 0.25
+        centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
+        exploration_goal_count: 10
+        exploration_goal_step: 3.0
+        cg_to_lidar: 2.4
+        centerline_step: 3.5
+        centerline_close_dist: 4.0
+        centerline_min_points: 20
+        centerline_post_smooth_passes: 3
+        centerline_refine_passes: 3
+        racing_use_map_corridor: true
+        racing_boundary_margin: 1.0
+        racing_mincurv_max_offset: 5.0
+        racing_mincurv_iters: 8000
+        racing_smooth_alpha: 0.4
+        racing_smooth_iters: 10
+        racing_smooth_max_dev: 1.5
+        racing_smooth_pre_iters: 4
+        racing_smooth_pre_alpha: 0.4
+        racing_smooth_coarse_points: 80
+        racing_smooth_energy_ratio: 0.03   # baseline 0.05; accepte un lissage plus agressif si mincurv gagne
+        racing_track_half_width: 8.0
+
+    path_tracker:
+      ros__parameters:
+        update_frequency: 50.0
+        centreofgravity_to_frontaxle: 1.483
+        centreofgravity_to_rearaxle: 1.483
+        wheelbase: 2.966
+        lookahead_gain: 0.3             # baseline 0.4; suit mieux les virages serrés F1
+        lookahead_min: 1.0              # baseline 1.5
+        lookahead_max: 6.0
+        lookahead_curv_extra: 3.0       # +lookahead en ligne droite (anti-zigzag), ~0 en virage
+        closest_search_ahead: 120
+        steering_limits: 0.95
+        steering_rate_limit: 4.0
+        steer_smoothing: 1.0
+        velocity_gain: 1.0
+        startup_ramp_s: 1.5             # baseline 2.0; atteint v_cruise plus tôt après le spawn
+        lateral_soft: 4.0
+        heading_soft: 1.2               # baseline 0.6; moins de freinage latéral/cap en virage
+
+- stack: pure_pursuit_lidar
+  profile: finetuned_perturbed
+  track: f1_circuit_fenced
+  line: racing
+  latency_ms: 200
+  odom_noise_std: 0.1
+  lap_count: 2
+  warmup_laps: 1
+  camera: false
+  navigation:
+    localisation:
+      ros__parameters:
+        update_frequency: 50.0
+        use_slam: true
+
+    local_planner:
+      ros__parameters:
+        update_frequency: 10.0
+        car_width: 2.0
+        centreofgravity_to_frontaxle: 1.483
+        frame_id: "base_link"
+        cruise_velocity: 8.0          # baseline 6.0; plafond ~8 m/s sur F1 twisty (voir docs/rapport_optimisation_f1.md)
+        avoid_velocity: 8.0
+        exploration_velocity: 3.5     # lap 1 un peu plus rapide sans agresser le scan centerline
+        max_lateral_accel: 5.5        # baseline 4.5; autorise plus de vitesse en virage
+        min_curvature: 0.012
+        curvature_lookahead: 60       # baseline 140; freine plus tard sur circuit sinueux
+        curvature_smooth_window: 5
+        accel_rate: 5.0               # baseline 4.0; remonte plus vite vers v_cruise
+        decel_rate: 7.0               # baseline 6.0
+
+    global_planner_lidar:
+      ros__parameters:
+        waypoints_ahead: 5
+        waypoints_behind: 2
+        passed_threshold: 0.25
+        centreofgravity_to_frontaxle: 1.483
+        waypoint_search_ahead: 30
+        exploration_goal_count: 10
+        exploration_goal_step: 3.0
+        cg_to_lidar: 2.4
+        centerline_step: 3.5
+        centerline_close_dist: 4.0
+        centerline_min_points: 20
+        centerline_post_smooth_passes: 3
+        centerline_refine_passes: 3
+        racing_use_map_corridor: true
+        racing_boundary_margin: 1.0
+        racing_mincurv_max_offset: 5.0
+        racing_mincurv_iters: 8000
+        racing_smooth_alpha: 0.4
+        racing_smooth_iters: 10
+        racing_smooth_max_dev: 1.5
+        racing_smooth_pre_iters: 4
+        racing_smooth_pre_alpha: 0.4
+        racing_smooth_coarse_points: 80
+        racing_smooth_energy_ratio: 0.03   # baseline 0.05; accepte un lissage plus agressif si mincurv gagne
+        racing_track_half_width: 8.0
+
+    path_tracker:
+      ros__parameters:
+        update_frequency: 50.0
+        centreofgravity_to_frontaxle: 1.483
+        centreofgravity_to_rearaxle: 1.483
+        wheelbase: 2.966
+        lookahead_gain: 0.3             # baseline 0.4; suit mieux les virages serrés F1
+        lookahead_min: 1.0              # baseline 1.5
+        lookahead_max: 6.0
+        lookahead_curv_extra: 3.0       # +lookahead en ligne droite (anti-zigzag), ~0 en virage
+        closest_search_ahead: 120
+        steering_limits: 0.95
+        steering_rate_limit: 4.0
+        steer_smoothing: 1.0
+        velocity_gain: 1.0
+        startup_ramp_s: 1.5             # baseline 2.0; atteint v_cruise plus tôt après le spawn
+        lateral_soft: 4.0
+        heading_soft: 1.2               # baseline 0.6; moins de freinage latéral/cap en virage
