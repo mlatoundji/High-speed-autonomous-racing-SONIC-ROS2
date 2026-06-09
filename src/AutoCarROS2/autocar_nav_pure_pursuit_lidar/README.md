@@ -94,6 +94,59 @@ Triggered exactly once when `/autocar/lap_count == 1` (from `**lap_timer**`). Th
 5. `/autocar/nav_mode` stays **exploration** (and `exploration_velocity`) until the racing line is ready; then switches to racing in one step with anchors + nearest-window `/autocar/goals`.
 6. Downstream `**local_planner`** / `**path_tracker**` unchanged except cruise speed uses `cruise_velocity` once `/autocar/nav_mode = 1`.
 
+### `global_planner_lidar` — where to go
+
+**Role:** decide *which route* the car should follow and publish a **sparse** polyline ahead of the vehicle. It does not smooth the path, plan speed, or send steering commands.
+
+| Direction | Topic | Role |
+|-----------|-------|------|
+| Subscribe | `/autocar/state2D` | Current pose (odom) |
+| Subscribe | `/scan` | Lap 1: gap-following corridor centerline |
+| Subscribe | `/map` | Lap 1 fallback + lap 2+ racing-line build |
+| Subscribe | `/autocar/lap_count` | Trigger one-time racing-line build when lap 1 completes |
+| Publish | `/autocar/goals` | Sparse waypoint window (~7–12 points: anchors + sliding window) |
+| Publish | `/autocar/nav_mode` | `0` = exploration, `1` = racing |
+| Publish | `/autocar/viz_goals` | RViz debug |
+
+**Lap 1:** live LiDAR/map centerline → `/autocar/goals` every 100 ms.
+
+**Lap 2+:** build min-curvature + smoothed racing line once from the lap-1 SLAM map (background thread), then slide a wrapped window along that cached loop. Keeps publishing exploration `/autocar/goals` until the racing line is ready, then switches `/autocar/nav_mode` to `1`.
+
+**Does not:** cubic spline interpolation, curvature speed limits, Pure Pursuit control, obstacle avoidance.
+
+### `local_planner` — smooth path + speed
+
+**Role:** bridge between sparse `/autocar/goals` and `path_tracker`. Turns the global polyline into a **dense, trackable** path and computes how fast the car may go.
+
+| Direction | Topic | Role |
+|-----------|-------|------|
+| Subscribe | `/autocar/goals` | Sparse polyline from `global_planner_lidar` |
+| Subscribe | `/autocar/state2D` | Pose for path anchoring and curvature look-ahead |
+| Subscribe | `/autocar/nav_mode` | Pick base speed: `exploration_velocity` vs `cruise_velocity` |
+| Publish | `/autocar/path` | Dense cubic-spline path (~0.1 m spacing, with yaw κ) |
+| Publish | `/autocar/target_velocity` | Speed target after curvature cap + ramp |
+| Publish | `/autocar/viz_path` | RViz debug |
+
+**On each new `/autocar/goals` message:**
+
+1. **Spline** — `cubic_spline_interpolator.generate_cubic_path` densifies the polyline (~10 Hz, `ds = 1/update_frequency`).
+2. **Speed cap** — scans curvature ahead of the front axle: `v ≤ √(max_lateral_accel / κ)`; takes the minimum with the mode base speed (`exploration_velocity` or `cruise_velocity`).
+3. **Ramp** — `apply_speed_ramp` limits accel/decel so `/autocar/target_velocity` changes smoothly.
+
+**Does not:** choose the route (that is `global_planner_lidar`), steer the car (that is `path_tracker`), or avoid obstacles.
+
+### Why not track `/autocar/goals` directly with Pure Pursuit?
+
+`path_tracker` expects a dense `/autocar/path` with per-point yaw, not a sparse polyline:
+
+| Issue | Sparse `/autocar/goals` | Dense `/autocar/path` |
+|-------|-------------------------|------------------------|
+| Lookahead | Arc-length interpolation jumps between 3–3.5 m segments → jerky steering | ~0.1 m spacing → smooth lookahead |
+| Heading | Mostly `(x, y)` only; no reliable tangent for Frenet errors | Spline yaw at every point |
+| Speed | No curvature profile | `local_planner` caps speed from κ ahead |
+
+Splitting **route** (`global_planner_lidar`) → **smooth path + speed** (`local_planner`) → **control** (`path_tracker`) matches the classic ROS pattern and keeps tuning independent (e.g. `cruise_velocity` / `curvature_lookahead` vs `lookahead_gain`).
+
 ### Coordinate frames
 
 

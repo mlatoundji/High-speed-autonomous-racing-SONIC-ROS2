@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Hybrid global planner: lap-1 LiDAR centerline, lap-2+ smoothed racing line from SLAM map."""
 
+import csv
 import threading
+from pathlib import Path
 
 import numpy as np
 import rclpy
@@ -71,6 +73,8 @@ class GlobalPlannerLidar(Node):
             ('centerline_step', 3.5),
             ('centerline_close_dist', 4.0),
             ('centerline_min_points', 20),
+            ('centerline_min_loop_len', 200.0),
+            ('centerline_min_bb_span', 80.0),
             ('centerline_post_smooth_passes', 3),
             ('centerline_refine_passes', 3),
             ('racing_use_map_corridor', True),
@@ -85,6 +89,10 @@ class GlobalPlannerLidar(Node):
             ('racing_smooth_coarse_points', 80),
             ('racing_smooth_energy_ratio', 0.05),
             ('racing_track_half_width', 8.0),
+            ('racing_resample_step', 2.7),
+            ('racing_build_delay_s', 5.0),
+            ('run_id', ''),
+            ('run_dir', ''),
         ])
 
         self.wp_ahead = int(self.get_parameter('waypoints_ahead').value)
@@ -98,6 +106,8 @@ class GlobalPlannerLidar(Node):
         self.centerline_step = float(self.get_parameter('centerline_step').value)
         self.centerline_close_dist = float(self.get_parameter('centerline_close_dist').value)
         self.centerline_min_points = int(self.get_parameter('centerline_min_points').value)
+        self.centerline_min_loop_len = float(self.get_parameter('centerline_min_loop_len').value)
+        self.centerline_min_bb_span = float(self.get_parameter('centerline_min_bb_span').value)
         self.centerline_post_smooth_passes = int(
             self.get_parameter('centerline_post_smooth_passes').value)
         self.centerline_refine_passes = int(self.get_parameter('centerline_refine_passes').value)
@@ -116,6 +126,10 @@ class GlobalPlannerLidar(Node):
         self.racing_smooth_energy_ratio = float(
             self.get_parameter('racing_smooth_energy_ratio').value)
         self.racing_track_half_width = float(self.get_parameter('racing_track_half_width').value)
+        self.racing_resample_step = float(self.get_parameter('racing_resample_step').value)
+        self.racing_build_delay_s = float(self.get_parameter('racing_build_delay_s').value)
+        self.run_id = str(self.get_parameter('run_id').value).strip()
+        self.run_dir = str(self.get_parameter('run_dir').value).strip()
 
         self.lap_count = 0
         self.x = None
@@ -123,6 +137,7 @@ class GlobalPlannerLidar(Node):
         self.theta = None
         self.closest_id = 0
         self._publish_key = None
+        self._last_goal_reject_reason = ''
 
         self.rx_map = np.array([])
         self.ry_map = np.array([])
@@ -130,6 +145,11 @@ class GlobalPlannerLidar(Node):
         self._racing_line_ready = False
         self._build_thread: threading.Thread | None = None
         self._racing_goals_force_once = False
+        self._last_racing_px: list[float] | None = None
+        self._last_racing_py: list[float] | None = None
+        self._racing_window_strategy: str = 'trimmed'
+        self._racing_line_saved = False
+        self._lap1_complete_time = None
 
         self.live_grid = None
         self.live_grid_info = None
@@ -149,6 +169,9 @@ class GlobalPlannerLidar(Node):
                 # First lap complete: exploration done, build racing line once.
                 self._racing_line_ready = False
                 self._racing_goals_force_once = False
+                self._racing_window_strategy = 'trimmed'
+                self._racing_line_saved = False
+                self._lap1_complete_time = self.get_clock().now()
                 self.get_logger().info(
                     'Lap 1 complete — building racing line from SLAM map')
 
@@ -218,6 +241,36 @@ class GlobalPlannerLidar(Node):
                 throttle_duration_sec=3.0)
             return
 
+        closure = float(np.hypot(cx[0] - cx[-1], cy[0] - cy[-1])) if len(cx) >= 2 else float('inf')
+        closure_limit = max(2.0 * self.centerline_step, 1.5 * self.centerline_close_dist)
+        if closure > closure_limit:
+            self.get_logger().warn(
+                f'Centerline extraction: open loop (closure {closure:.1f} m > {closure_limit:.1f} m); '
+                'skip racing line build this cycle',
+                throttle_duration_sec=2.0)
+            return
+
+        # Geometric sanity gates — reject partial/local loops that are too small.
+        pts = np.column_stack([cx, cy])
+        loop_segs = np.hypot(np.diff(np.append(pts[:, 0], pts[0, 0])),
+                             np.diff(np.append(pts[:, 1], pts[0, 1])))
+        loop_len = float(np.sum(loop_segs))
+        bb_span_x = float(cx.max() - cx.min())
+        bb_span_y = float(cy.max() - cy.min())
+        bb_span = max(bb_span_x, bb_span_y)
+        if loop_len < self.centerline_min_loop_len:
+            self.get_logger().warn(
+                f'Centerline extraction: loop too short ({loop_len:.1f} m < '
+                f'{self.centerline_min_loop_len:.1f} m); skip racing line build',
+                throttle_duration_sec=2.0)
+            return
+        if bb_span < self.centerline_min_bb_span:
+            self.get_logger().warn(
+                f'Centerline extraction: bbox too small ({bb_span:.1f} m < '
+                f'{self.centerline_min_bb_span:.1f} m); skip racing line build',
+                throttle_duration_sec=2.0)
+            return
+
         alpha_left = alpha_right = None
         track_half_width = self.racing_track_half_width
         if self.racing_use_map_corridor:
@@ -279,6 +332,13 @@ class GlobalPlannerLidar(Node):
                 f'Racing line: removed {n_removed} fold-back points '
                 f'({n_before} → {len(rx_map)} pts)')
 
+        if self.racing_resample_step > 0.0 and len(rx_map) >= 4:
+            rx_map, ry_map = self._resample_closed_uniform(
+                np.asarray(rx_map, dtype=float),
+                np.asarray(ry_map, dtype=float),
+                self.racing_resample_step,
+            )
+
         rx_arr = np.asarray(rx_map, dtype=float)
         ry_arr = np.asarray(ry_map, dtype=float)
         min_racing_pts = max(8, self.wp_ahead + self.wp_behind + 2)
@@ -299,6 +359,9 @@ class GlobalPlannerLidar(Node):
         self.closest_id = init_closest
         self._racing_goals_force_once = True
         self._racing_line_ready = True
+        if not self._racing_line_saved:
+            self._save_racing_line_results(rx_arr, ry_arr)
+            self._racing_line_saved = True
 
         corridor_note = ''
         if mincurv_info.get('map_corridor'):
@@ -325,29 +388,136 @@ class GlobalPlannerLidar(Node):
             f'max offset vs centerline {smooth_info["max_centerline_offset"]:.2f} m, '
             f'init closest_id={init_closest}')
 
+    def _save_racing_line_results(self, rx_map: np.ndarray, ry_map: np.ndarray) -> None:
+        """Persist map/odom racing line to the benchmark run directory."""
+        if not self.run_dir:
+            self.get_logger().warn(
+                'Racing line not saved: run_dir parameter is empty.',
+                throttle_duration_sec=5.0)
+            return
+        run_path = Path(self.run_dir).expanduser()
+        try:
+            run_path.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            self.get_logger().warn(f'Racing line save skipped: cannot create run_dir ({exc})')
+            return
+
+        map_csv = run_path / 'racing_line_map.csv'
+        try:
+            with map_csv.open('w', newline='', encoding='utf-8') as f:
+                w = csv.writer(f)
+                w.writerow(['index', 'x_map', 'y_map'])
+                for i, (x, y) in enumerate(zip(rx_map, ry_map)):
+                    w.writerow([i, float(x), float(y)])
+        except Exception as exc:
+            self.get_logger().warn(f'Failed writing {map_csv.name}: {exc}')
+            return
+
+        odom_line = self._racing_line_odom_from_map(rx_map, ry_map)
+        if odom_line is None:
+            self.get_logger().warn(
+                f'Racing line saved to {map_csv.name}; odom export skipped (TF unavailable).')
+            return
+        ox, oy = odom_line
+        odom_csv = run_path / 'racing_line_odom.csv'
+        try:
+            with odom_csv.open('w', newline='', encoding='utf-8') as f:
+                w = csv.writer(f)
+                w.writerow(['index', 'x_odom', 'y_odom'])
+                for i, (x, y) in enumerate(zip(ox, oy)):
+                    w.writerow([i, float(x), float(y)])
+        except Exception as exc:
+            self.get_logger().warn(f'Failed writing {odom_csv.name}: {exc}')
+            return
+
+        self.get_logger().info(
+            f'Racing line saved: {map_csv.name} and {odom_csv.name} '
+            f'({len(rx_map)} points, run_id={self.run_id or "unknown"})')
+
+    def _resample_closed_uniform(
+            self,
+            xs: np.ndarray,
+            ys: np.ndarray,
+            step: float) -> tuple[np.ndarray, np.ndarray]:
+        """Uniformly resample a closed loop to avoid long sparse segments."""
+        if len(xs) < 3 or step <= 0.0:
+            return xs, ys
+        closure = float(np.hypot(xs[0] - xs[-1], ys[0] - ys[-1]))
+        if closure > max(3.0 * step, 6.0):
+            # Not a closed loop; keep original points and let caller decide.
+            self.get_logger().warn(
+                f'Resample skipped: path is open (closure {closure:.1f} m)',
+                throttle_duration_sec=2.0)
+            return xs, ys
+        pts = np.column_stack([xs, ys])
+        pts = np.vstack([pts, pts[0]])
+        seg = np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 1]))
+        total = float(np.sum(seg))
+        if total < 1e-6:
+            return xs, ys
+        n = max(8, int(total / max(step, 0.1)))
+        cum = np.concatenate([[0.0], np.cumsum(seg)])
+        s = np.linspace(0.0, total, n, endpoint=False)
+        rx = np.interp(s, cum, pts[:, 0])
+        ry = np.interp(s, cum, pts[:, 1])
+        return np.asarray(rx, dtype=float), np.asarray(ry, dtype=float)
+
     def timer_cb(self):
         if self.x is None:
             return
 
         mode_msg = Int32()
-        if self.lap_count < 1 or not self._racing_line_ready:
-            mode_msg.data = 0  # exploration (also while racing line is building)
+        if self.lap_count < 1:
+            mode_msg.data = 0  # exploration
             self.mode_pub.publish(mode_msg)
-            if self.lap_count >= 1:
-                if self._build_thread is None or not self._build_thread.is_alive():
-                    t = threading.Thread(
-                        target=self._build_racing_line_from_map, daemon=True)
-                    self._build_thread = t
-                    t.start()
             self._publish_exploration_goals()
+            return
+
+        # First-principles state machine: once lap 1 is done, planner stays in
+        # racing mode and never falls back to exploration goals.
+        mode_msg.data = 1
+        self.mode_pub.publish(mode_msg)
+
+        can_build = True
+        if self.racing_build_delay_s > 0.0 and self._lap1_complete_time is not None:
+            elapsed = (self.get_clock().now() - self._lap1_complete_time).nanoseconds * 1e-9
+            can_build = elapsed >= self.racing_build_delay_s
+            if not can_build:
+                self.get_logger().info(
+                    f'Racing build delayed: {elapsed:.1f}/{self.racing_build_delay_s:.1f} s',
+                    throttle_duration_sec=1.0)
+        if (not self._racing_line_ready) and can_build and (
+                self._build_thread is None or not self._build_thread.is_alive()):
+            t = threading.Thread(
+                target=self._build_racing_line_from_map, daemon=True)
+            self._build_thread = t
+            t.start()
+
+        if self._publish_racing_goals():
+            return
+
+        if not self._racing_line_ready:
+            self.get_logger().info(
+                'Racing line building — holding previous goals',
+                throttle_duration_sec=2.0)
+            return
+
+        if self._last_racing_px and self._last_racing_py:
+            # Keep publishing last valid racing window if live anchoring/TF
+            # fails temporarily; do not switch back to exploration goals.
+            self._emit_goals(
+                self._last_racing_px,
+                self._last_racing_py,
+                'race-hold',
+                cid=self.closest_id,
+                force=False)
+            self.get_logger().warn(
+                'Racing goals unavailable — reusing last valid racing goals',
+                throttle_duration_sec=2.0)
         else:
-            mode_msg.data = 1  # racing
-            self.mode_pub.publish(mode_msg)
-            if not self._publish_racing_goals():
-                self.get_logger().warn(
-                    'Racing goals unavailable — holding exploration goals',
-                    throttle_duration_sec=2.0)
-                self._publish_exploration_goals()
+            self.get_logger().warn(
+                'Racing goals unavailable and no cached racing goals yet',
+                throttle_duration_sec=2.0)
 
     def _publish_exploration_goals(self):
         ranges = None
@@ -485,19 +655,77 @@ class GlobalPlannerLidar(Node):
             py: list[float],
             max_seg: float | None = None) -> bool:
         """Reject polylines with long jumps that produce infield spline loops."""
+        self._last_goal_reject_reason = ''
         if len(px) < 2:
+            self._last_goal_reject_reason = 'not enough points'
             return False
         limit = max_seg if max_seg is not None else max(
             4.0 * self.goal_step, 4.0 * self.centerline_step)
         for i in range(len(px) - 1):
-            if float(np.hypot(px[i + 1] - px[i], py[i + 1] - py[i])) > limit:
+            seg = float(np.hypot(px[i + 1] - px[i], py[i + 1] - py[i]))
+            if seg > limit:
+                self._last_goal_reject_reason = (
+                    f'long segment {i}->{i + 1}: {seg:.1f} m > {limit:.1f} m')
                 return False
         axle = self._front_axle_xy()
         if axle is not None:
             fx, fy = axle
-            if float(np.hypot(px[0] - fx, py[0] - fy)) > limit:
+            # With anchors prepended by `_prepend_path_anchors`, indices are:
+            # 0 = behind anchor, 1 = car anchor, 2 = first racing waypoint.
+            car_idx = 1 if len(px) >= 2 else 0
+            first_dist = float(np.hypot(px[car_idx] - fx, py[car_idx] - fy))
+            if first_dist > max(2.0, 0.75 * self.goal_step):
+                self._last_goal_reject_reason = (
+                    f'car anchor too far: {first_dist:.1f} m')
                 return False
+
+            # Prevent immediate "hook" after anchor insertion: segment from car
+            # anchor to the first racing waypoint must stay forward and local.
+            if len(px) >= 3 and self.theta is not None:
+                fwd_x, fwd_y = forward_vector(self.theta)
+                sx = float(px[2] - px[car_idx])
+                sy = float(py[2] - py[car_idx])
+                first_seg = float(np.hypot(sx, sy))
+                local_limit = max(2.5 * self.goal_step, 2.0 * self.centerline_step)
+                if first_seg > local_limit:
+                    self._last_goal_reject_reason = (
+                        f'car->first waypoint too long: {first_seg:.1f} m > {local_limit:.1f} m')
+                    return False
+                # Allow small local backward component on tight corners.
+                forward_proj = sx * fwd_x + sy * fwd_y
+                if forward_proj < -2.0:
+                    self._last_goal_reject_reason = (
+                        f'car->first waypoint backward: proj {forward_proj:.1f} m')
+                    return False
         return True
+
+    def _trim_leading_points_behind_car(
+            self,
+            px: list[float],
+            py: list[float]) -> tuple[list[float], list[float]]:
+        """Drop leading racing-window points that lie behind the car.
+
+        The racing window intentionally includes a few points behind `closest_id`
+        for continuity. After prepending anchors, starting the polyline with these
+        behind-points can force the spline to hook backwards near the car.
+        """
+        if not px or self.x is None or self.y is None or self.theta is None:
+            return px, py
+
+        fwd_x, fwd_y = forward_vector(self.theta)
+        keep_from = 0
+        for i, (x, y) in enumerate(zip(px, py)):
+            dx = float(x - self.x)
+            dy = float(y - self.y)
+            if dx * fwd_x + dy * fwd_y >= 0.0:
+                keep_from = i
+                break
+            keep_from = i + 1
+
+        # Keep at least one point if all were behind.
+        if keep_from >= len(px):
+            keep_from = len(px) - 1
+        return px[keep_from:], py[keep_from:]
 
     def _publish_racing_goals(self) -> bool:
         if not self._racing_line_ready:
@@ -513,14 +741,34 @@ class GlobalPlannerLidar(Node):
             return False
         fx, fy = axle
 
-        cid = closest_waypoint_index_closed(
+        # 1) Fast local tracking from previous index (steady-state).
+        cid_local = closest_waypoint_index_closed(
             fx, fy, rx, ry,
             start_idx=self.closest_id,
             search_ahead=self.search_ahead,
         )
-        if float(np.hypot(rx[cid] - fx, ry[cid] - fy)) > 6.0:
-            cid = closest_waypoint_index_closed_disambiguated(
-                fx, fy, self.theta, rx, ry, hint_idx=cid)
+        dist_local = float(np.hypot(rx[cid_local] - fx, ry[cid_local] - fy))
+
+        # 2) Robust global re-anchor + heading disambiguation (lap switch / seam).
+        d2 = (rx - fx) ** 2 + (ry - fy) ** 2
+        seed = int(np.argmin(d2))
+        cid_global = closest_waypoint_index_closed_disambiguated(
+            fx, fy, self.theta, rx, ry, hint_idx=seed, behind_margin=8.0)
+        dist_global = float(np.hypot(rx[cid_global] - fx, ry[cid_global] - fy))
+
+        # Prefer local continuity when valid; otherwise trust global anchor.
+        if dist_local <= 10.0:
+            cid = cid_local
+            dist_to_cid = dist_local
+        else:
+            cid = cid_global
+            dist_to_cid = dist_global
+
+        if dist_to_cid > 20.0:
+            self.get_logger().warn(
+                f'Racing re-anchor failed: nearest idx {cid} still {dist_to_cid:.1f} m away',
+                throttle_duration_sec=2.0)
+            return False
         self.closest_id = cid
 
         transform = self._body_offset(
@@ -539,16 +787,56 @@ class GlobalPlannerLidar(Node):
         if not indices:
             indices = list(range(min(half, self.racing_n)))
         mode = 'wrap' if (lo < 0 or hi > self.racing_n) else ('start' if cid < 2 else 'race')
-        px = rx[indices].tolist()
-        py = ry[indices].tolist()
-        px, py = self._prepend_path_anchors(px, py)
+        px_base = rx[indices].tolist()
+        py_base = ry[indices].tolist()
+        half = self.wp_ahead + self.wp_behind
 
-        if not self._goal_polyline_ok(px, py):
-            self.get_logger().warn(
-                f'Racing goals rejected: bad spacing near idx {cid} '
-                f'(dist to car {float(np.hypot(rx[cid] - fx, ry[cid] - fy)):.1f} m)',
-                throttle_duration_sec=2.0)
-            return False
+        # Try multiple window constructions before giving up.
+        candidates: dict[str, tuple[list[float], list[float]]] = {}
+        tpx, tpy = self._trim_leading_points_behind_car(px_base, py_base)
+        candidates['trimmed'] = self._prepend_path_anchors(tpx, tpy)
+        candidates['untrimmed'] = self._prepend_path_anchors(px_base, py_base)
+        fw_indices = [(cid + i) % self.racing_n for i in range(max(2, half))]
+        fw_px = rx[fw_indices].tolist()
+        fw_py = ry[fw_indices].tolist()
+        candidates['forward-only'] = self._prepend_path_anchors(fw_px, fw_py)
+
+        picked: tuple[str, list[float], list[float]] | None = None
+        reject_reasons: list[str] = []
+        ordered_labels = [self._racing_window_strategy]
+        ordered_labels += [k for k in ('trimmed', 'untrimmed', 'forward-only')
+                           if k != self._racing_window_strategy and k in candidates]
+        for label in ordered_labels:
+            cx, cy = candidates[label]
+            if self._goal_polyline_ok(cx, cy):
+                picked = (label, cx, cy)
+                break
+            reject_reasons.append(f'{label}: {self._last_goal_reject_reason or "unknown"}')
+
+        if picked is None:
+            # Last resort: keep the previous valid racing goals to avoid mode thrash.
+            if self._last_racing_px and self._last_racing_py:
+                self.get_logger().warn(
+                    f'Racing goals: reusing last valid window near idx {cid} '
+                    f'(dist {dist_to_cid:.1f} m, rejects: {" | ".join(reject_reasons)})',
+                    throttle_duration_sec=2.0)
+                px, py = self._last_racing_px, self._last_racing_py
+            else:
+                self.get_logger().warn(
+                    f'Racing goals rejected: bad spacing near idx {cid} '
+                    f'(dist to car {dist_to_cid:.1f} m, '
+                    f'reasons: {" | ".join(reject_reasons) or "unknown"})',
+                    throttle_duration_sec=2.0)
+                return False
+        else:
+            label, px, py = picked
+            if label != self._racing_window_strategy:
+                self.get_logger().warn(
+                    f'Racing goals: strategy {self._racing_window_strategy} -> {label} near idx {cid}',
+                    throttle_duration_sec=2.0)
+            self._racing_window_strategy = label
+            self._last_racing_px = px
+            self._last_racing_py = py
 
         force = self._racing_goals_force_once
         self._racing_goals_force_once = False

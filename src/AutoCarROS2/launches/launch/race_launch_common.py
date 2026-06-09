@@ -420,7 +420,23 @@ def navigation_nodes_lidar(context, navpkg, stack, navconfig):
 
     base_params = [navconfig, {'use_sim_time': use_sim_time}]
     injector_params = {'use_sim_time': use_sim_time}
-    planner_params = base_params
+    run_meta = lap_timer_parameters(
+        stack,
+        use_sim_time,
+        navconfig,
+        line=line,
+        profile=profile,
+        latency_ms=latency_ms,
+        odom_noise_std=odom_noise_std,
+    )
+    planner_params = [
+        navconfig,
+        {'use_sim_time': use_sim_time},
+        {
+            'run_id': run_meta['run_id'],
+            'run_dir': run_meta['run_dir'],
+        },
+    ]
 
     tracker_remappings = (
         [] if use_control_manager
@@ -488,15 +504,7 @@ def navigation_nodes_lidar(context, navpkg, stack, navconfig):
             executable='lap_timer.py',
             parameters=[
                 {
-                    **lap_timer_parameters(
-                        stack,
-                        use_sim_time,
-                        navconfig,
-                        line=line,
-                        profile=profile,
-                        latency_ms=latency_ms,
-                        odom_noise_std=odom_noise_std,
-                    ),
+                    **run_meta,
                     **resolve_lap_timer_params(track),
                 },
             ],
