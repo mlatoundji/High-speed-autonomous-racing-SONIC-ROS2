@@ -19,7 +19,6 @@ from tf2_ros import Buffer, TransformListener
 
 from autocar_msgs.msg import Path2D, State2D
 from autocar_nav_pure_pursuit_lidar.centerline_extractor import extract_local_centerline
-from autocar_nav_pure_pursuit_lidar.map_centerline import extract_loop_centerline_from_map
 from autocar_nav_pure_pursuit_lidar.map_track_geometry import (
     map_corridor_bounds_for_polyline,
     mean_corridor_half_width,
@@ -152,6 +151,11 @@ class GlobalPlannerLidar(Node):
         self._racing_line_saved = False
         self._lap1_complete_time = None
 
+        # Recorded driven trajectory (map frame) during the exploration lap. Used as
+        # a robust centerline seed for the racing line (the corridor march derails at
+        # corners; the driven path is a clean closed loop by construction).
+        self._explore_path: list[tuple[float, float]] = []
+
         self.live_grid = None
         self.live_grid_info = None
         self.map_frame_id = 'map'
@@ -212,6 +216,16 @@ class GlobalPlannerLidar(Node):
             return None
         return slam_pose_in_map(map_to_base)
 
+    def _build_racing_line_safe(self) -> None:
+        """Run the racing-line build, logging the traceback if it raises -- a daemon
+        thread's exception would otherwise be silently swallowed."""
+        try:
+            self._build_racing_line_from_map()
+        except Exception:  # noqa: BLE001
+            import traceback
+            self.get_logger().error(
+                'Racing line build failed:\n' + traceback.format_exc())
+
     def _build_racing_line_from_map(self) -> None:
         # Snapshot mutable ROS state up front so this method is safe to run in a
         # background thread while timer_cb / map_cb continue on the main thread.
@@ -222,26 +236,35 @@ class GlobalPlannerLidar(Node):
         if self.map_frame_id != 'map':
             return
 
-        map_pose = self._map_frame_pose()
-        if map_pose is None:
-            return
-
-        mx, my, myaw = map_pose
-        cx, cy = extract_loop_centerline_from_map(
-            grid, grid_info,
-            mx, my, myaw,
-            step=self.centerline_step,
-            close_dist=self.centerline_close_dist,
-            min_points=self.centerline_min_points,
-            post_smooth_passes=self.centerline_post_smooth_passes,
-            refine_passes=self.centerline_refine_passes,
-        )
-        if len(cx) < self.centerline_min_points:
+        # Centerline seed = the recorded EXPLORATION TRAJECTORY (map frame). The car
+        # drove a clean closed lap, so its driven path is a robust centerline — far
+        # more reliable than marching the corridor (which derails at corners and
+        # never closes the loop).
+        path = list(self._explore_path)
+        if len(path) < self.centerline_min_points:
             self.get_logger().warn(
-                f'Centerline extraction: only {len(cx)} points (need '
+                f'Exploration path too short: {len(path)} points (need '
                 f'{self.centerline_min_points})',
                 throttle_duration_sec=3.0)
             return
+        cx = np.asarray([p[0] for p in path], dtype=float)
+        cy = np.asarray([p[1] for p in path], dtype=float)
+
+        # Resample the driven loop to UNIFORM spacing as a CLOSED loop. Recording
+        # starts a bit after spawn (when the SLAM TF is up) and ends at the finish
+        # line, so the first/last points don't meet -> a big seam jump that makes the
+        # car get stuck oscillating at the loop seam (idx 0/146). Interpolating the
+        # closed loop (the seam falls on the main straight) removes that jump.
+        px_loop = np.append(cx, cx[0])
+        py_loop = np.append(cy, cy[0])
+        seg = np.hypot(np.diff(px_loop), np.diff(py_loop))
+        cum = np.concatenate([[0.0], np.cumsum(seg)])
+        total = float(cum[-1])
+        if total > 1e-6:
+            n_pts = max(int(total / self.centerline_step), self.centerline_min_points)
+            s = np.linspace(0.0, total, n_pts, endpoint=False)
+            cx = np.interp(s, cum, px_loop)
+            cy = np.interp(s, cum, py_loop)
 
         closure = float(np.hypot(cx[0] - cx[-1], cy[0] - cy[-1])) if len(cx) >= 2 else float('inf')
         closure_limit = max(2.0 * self.centerline_step, 1.5 * self.centerline_close_dist)
@@ -464,9 +487,24 @@ class GlobalPlannerLidar(Node):
         ry = np.interp(s, cum, pts[:, 1])
         return np.asarray(rx, dtype=float), np.asarray(ry, dtype=float)
 
+    def _record_explore_pose(self):
+        """Append the car's map-frame position to the driven trajectory, spaced by
+        ~centerline_step so it directly serves as a centerline seed."""
+        mp = self._map_frame_pose()
+        if mp is None:
+            return
+        if (not self._explore_path
+                or np.hypot(mp[0] - self._explore_path[-1][0],
+                            mp[1] - self._explore_path[-1][1]) >= self.centerline_step):
+            self._explore_path.append((float(mp[0]), float(mp[1])))
+
     def timer_cb(self):
         if self.x is None:
             return
+
+        # Record the driven path during exploration (lap 1) -> centerline seed.
+        if self.lap_count < 1:
+            self._record_explore_pose()
 
         mode_msg = Int32()
         if self.lap_count < 1:
@@ -486,7 +524,7 @@ class GlobalPlannerLidar(Node):
         if (not self._racing_line_ready) and can_build and (
                 self._build_thread is None or not self._build_thread.is_alive()):
             t = threading.Thread(
-                target=self._build_racing_line_from_map, daemon=True)
+                target=self._build_racing_line_safe, daemon=True)
             self._build_thread = t
             t.start()
 
@@ -754,22 +792,32 @@ class GlobalPlannerLidar(Node):
             start_idx=self.closest_id,
             search_ahead=self.search_ahead,
         )
+        cid = cid_local
         dist_local = float(np.hypot(rx[cid_local] - fx, ry[cid_local] - fy))
 
-        # 2) Robust global re-anchor + heading disambiguation (lap switch / seam).
-        d2 = (rx - fx) ** 2 + (ry - fy) ** 2
-        seed = int(np.argmin(d2))
-        cid_global = closest_waypoint_index_closed_disambiguated(
-            fx, fy, self.theta, rx, ry, hint_idx=seed, behind_margin=8.0)
-        dist_global = float(np.hypot(rx[cid_global] - fx, ry[cid_global] - fy))
+        # Heading disambiguation when windowed search is stale.
+        if dist_local > 6.0:
+            cid = closest_waypoint_index_closed_disambiguated(
+                fx, fy, self.theta, rx, ry, hint_idx=cid_local, behind_margin=8.0)
+        dist_to_cid = float(np.hypot(rx[cid] - fx, ry[cid] - fy))
 
-        # Prefer local continuity when valid; otherwise trust global anchor.
-        if dist_local <= 10.0:
-            cid = cid_local
-            dist_to_cid = dist_local
-        else:
-            cid = cid_global
-            dist_to_cid = dist_global
+        # Still far -> forward-ahead global re-acquire (seam at lap2 start).
+        if dist_to_cid > 6.0:
+            hx, hy = -np.sin(self.theta), np.cos(self.theta)
+            ahead = (rx - fx) * hx + (ry - fy) * hy
+            d2 = (rx - fx) ** 2 + (ry - fy) ** 2
+            fwd = np.nonzero(ahead > -1.0)[0]
+            gd = dist_to_cid
+            if fwd.size:
+                cid = int(fwd[np.argmin(d2[fwd])])
+            else:
+                cid = int(np.argmin(d2))
+            dist_to_cid = float(np.hypot(rx[cid] - fx, ry[cid] - fy))
+            self.get_logger().info(
+                f'Racing closest re-acquired (forward): idx {cid}, dist '
+                f'{dist_to_cid:.1f} m, '
+                f'ahead={float(ahead[cid]):.1f} m (windowed was {gd:.1f} m)',
+                throttle_duration_sec=2.0)
 
         if dist_to_cid > 20.0:
             self.get_logger().warn(
@@ -789,11 +837,18 @@ class GlobalPlannerLidar(Node):
             lo = cid - self.wp_behind
             hi = cid + self.wp_ahead
 
+        # Do NOT let the "behind" window wrap BACKWARD across the loop seam. At the
+        # start (cid small) lo goes negative and i % racing_n wraps it to the END of the
+        # loop (the finish line, physically behind the car across the seam) -> the goal
+        # path loops backward (the green line the user saw). Clamp so behind points never
+        # cross the seam. The FORWARD wrap (hi > racing_n near the end) is kept untouched.
+        if lo < 0:
+            lo = 0
         # Forward arc along the loop (index order == track order).
         indices = [i % self.racing_n for i in range(lo, hi)]
         if not indices:
             indices = list(range(min(half, self.racing_n)))
-        mode = 'wrap' if (lo < 0 or hi > self.racing_n) else ('start' if cid < 2 else 'race')
+        mode = 'wrap' if hi > self.racing_n else ('start' if cid < 2 else 'race')
         px_base = rx[indices].tolist()
         py_base = ry[indices].tolist()
         half = self.wp_ahead + self.wp_behind

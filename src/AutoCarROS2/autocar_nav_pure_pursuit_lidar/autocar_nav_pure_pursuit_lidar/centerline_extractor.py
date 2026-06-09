@@ -18,6 +18,11 @@ OCCUPIED = 50
 RAY_STEP = 0.25
 LIDAR_MOUNT_YAW = math.pi / 2  # hokuyo_link yaw relative to base_link
 TRACK_HALF_WIDTH = 8.0
+# Follow-the-gap forward cone (rad): only consider gaps within this half-angle of
+# straight-ahead. Without it, a wide/open section's biggest gap points sideways
+# and the car veers off the track ("se perd en zone large"). ~60 deg still follows
+# normal corners.
+FORWARD_CONE = 1.05
 MAX_LATERAL_OFFSET = 3.0
 MIN_WALL_DISTANCE = 2.5
 
@@ -90,8 +95,12 @@ def _lateral_ray_to_boundary(
         oy: float,
         dir_x: float,
         dir_y: float,
-        max_dist: float = 14.0) -> float | None:
-    """March along unit direction until occupied cell or max_dist."""
+        max_dist: float = 20.0) -> float | None:
+    """March along unit direction until occupied cell or max_dist.
+
+    max_dist 14->20: a longer ray finds the outer wall on wider corners so the
+    corridor midpoint stays centred (a too-short ray misses it -> no centring ->
+    the march/exploration drifts off)."""
     norm = math.hypot(dir_x, dir_y) or 1.0
     ux, uy = dir_x / norm, dir_y / norm
     dist = RAY_STEP
@@ -198,10 +207,13 @@ def centerline_from_scan(
     nd = len(distances)
 
     # Pass 1: compute gap angle for every distance.
+    # Only consider gaps within the forward cone: a sideways opening in a wide
+    # section has the biggest gap but points off-track and would make the car veer.
+    forward_mask = np.abs(angles) <= FORWARD_CONE
     fallback = 0.0
     gap_angles: list[float] = []
     for d in distances:
-        a = _gap_center_angle(angles, r_arr >= d)
+        a = _gap_center_angle(angles, (r_arr >= d) & forward_mask)
         if a is None:
             a = fallback
         else:
@@ -230,6 +242,20 @@ def centerline_from_scan(
     return pts
 
 
+def _bound_centerline(pts, x, y, distances, margin=10.0):
+    """Drop garbage far points. Each goal i sits ~distances[i] ahead, so a point
+    farther than distances[i] + a corridor margin means the corridor was lost (a
+    far-point artefact that sends the car off). Truncate at the first such point."""
+    out = []
+    for i, (px, py) in enumerate(pts):
+        d = distances[i] if i < len(distances) else distances[-1]
+        if (px - x) ** 2 + (py - y) ** 2 <= (d + margin) ** 2:
+            out.append((px, py))
+        else:
+            break
+    return out
+
+
 def extract_local_centerline(
         x: float,
         y: float,
@@ -255,6 +281,7 @@ def extract_local_centerline(
             scan_ranges, scan_angle_min, scan_angle_increment,
             scan_range_min, scan_range_max,
             x, y, yaw, cg_to_lidar, distances)
+        pts = _bound_centerline(pts, x, y, distances)
         if len(pts) >= 2:
             return pts
 
@@ -263,6 +290,7 @@ def extract_local_centerline(
         gy = map_y if map_y is not None else y
         gyaw = map_yaw if map_yaw is not None else yaw
         pts = centerline_from_map(grid, grid_info, gx, gy, gyaw, distances)
+        pts = _bound_centerline(pts, x, y, distances)
         if len(pts) >= 2:
             return pts
 
