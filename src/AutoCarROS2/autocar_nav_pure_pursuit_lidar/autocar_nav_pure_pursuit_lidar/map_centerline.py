@@ -47,13 +47,20 @@ def extract_loop_centerline_from_map(
         min_points: int = 20,
         max_points: int = 400,
         post_smooth_passes: int = 0,
-        refine_passes: int = 3) -> tuple[np.ndarray, np.ndarray]:
-    """March along the map corridor, then refine vertices against grid boundaries."""
+        refine_passes: int = 3,
+        max_jump: float = 12.0) -> tuple[np.ndarray, np.ndarray]:
+    """March along the map corridor, then refine vertices against grid boundaries.
+
+    Returns empty arrays if the march never closes a loop (incomplete map) or if the
+    corridor midpoint jumps farther than ``max_jump`` from the query point (corridor
+    lost in an unexplored region) — so a partial/garbage centerline is never returned.
+    """
     fwd_x, fwd_y = forward_vector(start_yaw)
     start_psi = math.atan2(fwd_y, fwd_x)
     x, y = start_x, start_y
     xs: list[float] = []
     ys: list[float] = []
+    closed = False
 
     for _ in range(max_points):
         if len(xs) >= 2:
@@ -64,7 +71,12 @@ def extract_loop_centerline_from_map(
             tangent_psi = start_psi
 
         mx, my = _corridor_midpoint_with_tangent(grid, info, x, y, tangent_psi)
+        # Corridor not found here (map gap / unexplored): the midpoint jumps far from
+        # the query point. Abort the march instead of shooting off-map.
+        if np.hypot(mx - x, my - y) > max_jump:
+            break
         if xs and np.hypot(mx - xs[0], my - ys[0]) < close_dist and len(xs) >= min_points:
+            closed = True
             break
 
         xs.append(mx)
@@ -83,9 +95,16 @@ def extract_loop_centerline_from_map(
         ddy = nmy - my
         if abs(ddx) < 1e-6 and abs(ddy) < 1e-6:
             break
+        if np.hypot(nmx - look_x, nmy - look_y) > max_jump:
+            break
 
         psi = math.atan2(ddy, ddx)
         x, y = nmx, nmy
+
+    # A usable centerline must be a CLOSED loop. If the march never closed (incomplete
+    # map / corridor lost), return empty so the caller rejects it and keeps exploring.
+    if not closed:
+        return np.asarray([], dtype=float), np.asarray([], dtype=float)
 
     arr_x = np.asarray(xs, dtype=float)
     arr_y = np.asarray(ys, dtype=float)
