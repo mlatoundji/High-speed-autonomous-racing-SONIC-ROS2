@@ -60,8 +60,6 @@
         centerline_step: 3.5
         centerline_close_dist: 4.0
         centerline_min_points: 20
-        centerline_min_loop_len: 200.0
-        centerline_min_bb_span: 80.0
         centerline_post_smooth_passes: 3
         centerline_refine_passes: 3
         racing_use_map_corridor: true
@@ -76,8 +74,6 @@
         racing_smooth_coarse_points: 80
         racing_smooth_energy_ratio: 0.05
         racing_track_half_width: 8.0
-        racing_resample_step: 2.7
-        racing_build_delay_s: 5.0
 
     path_tracker:
       ros__parameters:
@@ -141,8 +137,6 @@
         centerline_step: 3.5
         centerline_close_dist: 4.0
         centerline_min_points: 20
-        centerline_min_loop_len: 200.0
-        centerline_min_bb_span: 80.0
         centerline_post_smooth_passes: 3
         centerline_refine_passes: 3
         racing_use_map_corridor: true
@@ -157,8 +151,6 @@
         racing_smooth_coarse_points: 80
         racing_smooth_energy_ratio: 0.03   # baseline 0.05; accepte un lissage plus agressif si mincurv gagne
         racing_track_half_width: 8.0
-        racing_resample_step: 2.7
-        racing_build_delay_s: 5.0
 
     path_tracker:
       ros__parameters:
@@ -223,8 +215,6 @@
         centerline_step: 3.5
         centerline_close_dist: 4.0
         centerline_min_points: 20
-        centerline_min_loop_len: 200.0
-        centerline_min_bb_span: 80.0
         centerline_post_smooth_passes: 3
         centerline_refine_passes: 3
         racing_use_map_corridor: true
@@ -239,8 +229,6 @@
         racing_smooth_coarse_points: 80
         racing_smooth_energy_ratio: 0.03   # baseline 0.05; accepte un lissage plus agressif si mincurv gagne
         racing_track_half_width: 8.0
-        racing_resample_step: 2.7
-        racing_build_delay_s: 5.0
 
     path_tracker:
       ros__parameters:

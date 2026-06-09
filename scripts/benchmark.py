@@ -57,12 +57,6 @@ VALID_TRACKS: FrozenSet[str] = frozenset({
 LAP_TIMEOUT_S = 600.0
 LAUNCH_SHUTDOWN_TIMEOUT_S = 20.0
 _HARD_RESET_PGREP_PATTERNS = (
-    # Generic ROS 2 process signatures (kill all ROS2-related processes on reset).
-    'ros2',
-    '/opt/ros/',
-    'ros-args',
-    'rclcpp',
-    'rclpy',
     'ros2 launch',
     'tracker.py',
     'localplanner.py',
@@ -324,7 +318,7 @@ def hard_reset_ros_sim() -> None:
     Same sequence as the manual reset documented in README.md (``pkill`` /
     ``killall`` / ``ros2 daemon stop|start``).
     """
-    _log('hard reset between runs (kill all ROS2 + Gazebo processes)')
+    _log('hard reset between runs (ROS/Gazebo cleanup)')
     for pattern in _HARD_RESET_PGREP_PATTERNS:
         _run_quiet(['pkill', '-9', '-f', pattern])
     for name in _HARD_RESET_KILLALL:
