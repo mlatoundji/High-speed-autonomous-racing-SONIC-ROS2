@@ -5,7 +5,7 @@ LiDAR + SLAM driven Pure Pursuit navigation stack. Two phases in a single simula
 | Phase | Trigger | Path source |
 |-------|---------|-------------|
 | **Lap 1 — exploration** | `lap_count < 1` | Live LiDAR + SLAM `/map` → local corridor centerline |
-| **Lap 2+ — racing** | `lap_count >= 1` | Lap-1 SLAM map → centerline → min-curvature → Laplacian smooth |
+| **Lap 2+ — racing** | `lap_count == 1` (built once) | Lap-1 SLAM map → centerline → min-curvature → Laplacian smooth |
 
 No precomputed waypoint CSV; the map stays in memory only (`slam_toolbox` does not save to disk).
 
@@ -94,24 +94,24 @@ flowchart TB
 2. **`slam_toolbox`** subscribes to `/scan` + odom TF, builds the map asynchronously, publishes `/map` (~1 Hz) and `map→odom` TF.
 3. **`localisation`** composes `map→odom` and `map→base_link`, outputs SLAM-corrected `/autocar/state2D_raw`.
 4. **`global_planner_lidar`** (10 Hz):
-   - Uses **`centerline_extractor`** on `/scan` to estimate left/right clearance and build a short forward centerline;
-   - When SLAM TF is available, fuses **`centerline_from_map`** (lateral ray casts on the occupancy grid);
-   - Transforms map-frame points to odom via **`map_point_to_odom`**, prepends two anchor points behind the car;
+   - Uses **`centerline_extractor.centerline_from_scan`** on `/scan`: for each goal distance `d`, finds the **largest contiguous arc of scan rays unobstructed at `d`** and places the goal at the arc's center angle. This gap-following approach steers naturally through corners and hairpins where a wall directly ahead would be invisible to a simple lateral-offset method.
+   - Falls back to **`centerline_from_map`** (lateral ray casts on the occupancy grid) when no scan is available.
+   - Prepends two anchor points behind the car; scan-based points are already in odom frame and are published directly (no extra frame transform).
    - Publishes `/autocar/goals` (`Path2D` polyline).
 5. **`local_planner`** cubic-splines the goals (**`cubic_spline_interpolator`**), limits speed by curvature (`exploration_velocity`), publishes `/autocar/path` and `/autocar/target_velocity`.
 6. **`path_tracker`** runs **`pure_pursuit`** steering and throttle, publishes `/autocar/auto_cmd_vel` (remapped to `/autocar/cmd_vel` by default).
 
 ### Lap 2+ — racing (`nav_mode = 1`)
 
-Triggered when `/autocar/lap_count >= 1` (from **`lap_timer`**).
+Triggered exactly once when `/autocar/lap_count == 1` (from **`lap_timer`**). The racing line is built once from the lap-1 SLAM map and reused for all subsequent laps.
 
-1. **`global_planner_lidar`** builds the racing line once (or after each lap reset) from the SLAM map:
+1. **`global_planner_lidar`** builds the racing line from the completed SLAM map:
    - **`map_centerline.extract_loop_centerline_from_map`**: march the loop, then **`map_track_geometry.refine_closed_centerline_from_map`** re-snaps each vertex to the geometric midpoint between map ray-cast boundaries;
    - **`map_track_geometry.map_corridor_bounds_for_polyline`**: per-point left/right clearance from the grid (`racing_use_map_corridor`);
    - **`racing_line_mincurv.compute_mincurv_racing_line`**: min-curvature optimise inside the map-derived asymmetric corridor (not a fixed ±5 m);
    - **`racing_line_smooth.compute_smooth_racing_line`**: Laplacian polish, bounded by measured corridor half-width;
    - Caches `rx_map/ry_map` in the **map** frame; transforms to odom via a snapshot `map→odom` TF taken at build time (avoids goal jitter).
-2. Sliding-window waypoints along the racing line (`waypoints_ahead/behind`), same logic as the original global planner, publishes `/autocar/goals`.
+2. Sliding-window waypoints along the racing line (`waypoints_ahead/behind`) using **wrapped index arithmetic** (`i % racing_n`) so the loop seam between the last and first waypoint is seamless. Publishes `/autocar/goals`.
 3. Downstream **`local_planner`** / **`path_tracker`** unchanged except cruise speed uses `cruise_velocity`.
 
 ### Coordinate frames
@@ -171,7 +171,7 @@ autocar_nav_pure_pursuit_lidar/
 
 | File | Used by | Purpose |
 |------|---------|---------|
-| `centerline_extractor.py` | `global_planner_lidar` | Lap 1: short-range corridor centerline from `/scan` or `/map` |
+| `centerline_extractor.py` | `global_planner_lidar` | Lap 1: gap-following centerline from `/scan` (largest clear arc per distance) or lateral ray casts on `/map` |
 | `map_centerline.py` | `global_planner_lidar` | Lap 2+: closed-loop centerline from occupancy grid |
 | `map_track_geometry.py` | `global_planner_lidar` | Map-native corridor refine + per-point boundary limits |
 | `racing_line_mincurv.py` | `global_planner_lidar` | Min-curvature racing line: `centerline + alpha * normal` within corridor |
@@ -266,7 +266,7 @@ python3 scripts/benchmark.py --config scripts/configs/f1_pure_pursuit_lidar.yaml
 | Log | Meaning |
 |-----|---------|
 | `SLAM /map received: WxH cells` | `global_planner_lidar` subscribed to the map successfully |
-| `Switching to RACING mode` | Lap 2+; building racing line from map |
+| `Switching to RACING mode` | Lap 1 complete; building racing line from SLAM map (once) |
 | `Racing line ready: N pts` | Min-curv + smooth pipeline done (check `mincurv R_min` and `smooth R_min`) |
 | `mincurv ... (fallback: centerline)` | Min-curv did not beat centerline curvature; using centerline for smooth step |
 | `smooth ... (fallback: original)` | Laplacian polish skipped; using min-curv line as-is |

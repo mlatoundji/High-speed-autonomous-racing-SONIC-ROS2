@@ -139,7 +139,8 @@ class GlobalPlannerLidar(Node):
     def lap_cb(self, msg: Int32):
         if msg.data > self.lap_count:
             self.lap_count = msg.data
-            if self.lap_count >= 1:
+            if self.lap_count == 1:
+                # First lap complete: exploration done, build racing line once.
                 self._racing_line_ready = False
                 self._map_to_odom_snapshot = None
                 self.get_logger().info(
@@ -317,6 +318,8 @@ class GlobalPlannerLidar(Node):
         if grid is not None and self.map_frame_id == 'map':
             map_pose = self._map_frame_pose()
 
+        scan_available = ranges is not None and len(ranges) > 0
+
         pts = extract_local_centerline(
             self.x, self.y, self.theta, self.cg2lidar,
             self.goal_step, self.goal_count,
@@ -333,11 +336,25 @@ class GlobalPlannerLidar(Node):
         )
 
         fwd_x, fwd_y = forward_vector(self.theta)
+
+        # Align the anchor with the first goal direction so the cubic spline's
+        # tangent at the car's position immediately follows the corridor rather
+        # than extending the car's current heading.  On a straight road the
+        # first goal is forward and this reduces to the original behaviour.
+        if pts:
+            dx = pts[0][0] - self.x
+            dy = pts[0][1] - self.y
+            d = float(np.hypot(dx, dy)) or 1.0
+            anchor_x, anchor_y = dx / d, dy / d
+        else:
+            anchor_x, anchor_y = fwd_x, fwd_y
+
         behind = [
-            (self.x - self.goal_step * fwd_x, self.y - self.goal_step * fwd_y),
+            (self.x - self.goal_step * anchor_x, self.y - self.goal_step * anchor_y),
             (self.x, self.y),
         ]
-        if map_pose is not None and grid is not None:
+        # Only transform map-frame pts to odom. Scan-based pts are already in odom.
+        if not scan_available and map_pose is not None and grid is not None:
             try:
                 map_to_odom = self._lookup_map_to_odom()
                 pts = [map_point_to_odom(px, py, map_to_odom) for px, py in pts]
@@ -387,28 +404,23 @@ class GlobalPlannerLidar(Node):
         transform = self._body_offset(
             rx[cid], ry[cid], fx, fy, self.theta)
 
-        if cid < 2:
-            mode = 'start'
-            px = rx[0:self.wp_ahead + self.wp_behind]
-            py = ry[0:self.wp_ahead + self.wp_behind]
-        elif cid > (self.racing_n - self.wp_ahead - self.wp_behind):
-            mode = 'end'
-            px = rx[-(self.wp_ahead + self.wp_behind):]
-            py = ry[-(self.wp_ahead + self.wp_behind):]
-        elif transform[1] < -self.passed_threshold:
-            mode = 'passed'
+        half = self.wp_ahead + self.wp_behind
+        if transform[1] < -self.passed_threshold:
             lo = cid - (self.wp_behind - 1)
             hi = cid + (self.wp_ahead + 1)
-            px = rx[lo:hi]
-            py = ry[lo:hi]
         else:
-            mode = 'approach'
             lo = cid - self.wp_behind
             hi = cid + self.wp_ahead
-            px = rx[lo:hi]
-            py = ry[lo:hi]
 
-        self._emit_goals(px.tolist(), py.tolist(), mode, cid)
+        # Wrap indices for a closed loop so the end-of-array seam is smooth.
+        indices = [i % self.racing_n for i in range(lo, hi)]
+        if not indices:
+            indices = list(range(min(half, self.racing_n)))
+        mode = 'wrap' if (lo < 0 or hi > self.racing_n) else ('start' if cid < 2 else 'race')
+        px = rx[indices].tolist()
+        py = ry[indices].tolist()
+
+        self._emit_goals(px, py, mode, cid)
 
     def _body_offset(self, px, py, ax, ay, theta):
         c, s = np.cos(-theta), np.sin(-theta)

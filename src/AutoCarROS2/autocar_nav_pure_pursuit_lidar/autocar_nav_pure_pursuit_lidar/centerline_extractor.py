@@ -34,61 +34,6 @@ def _lidar_pose(x: float, y: float, yaw: float, cg_to_lidar: float) -> tuple[flo
     return lx, ly, yaw + LIDAR_MOUNT_YAW
 
 
-def _hit_xy_in_odom(
-        angle: float,
-        dist: float,
-        lidar_x: float,
-        lidar_y: float,
-        lidar_yaw: float) -> tuple[float, float]:
-    """Scan endpoint in odom (angles relative to lidar link frame)."""
-    px = dist * math.cos(angle)
-    py = dist * math.sin(angle)
-    wx = lidar_x + px * math.cos(lidar_yaw) - py * math.sin(lidar_yaw)
-    wy = lidar_y + px * math.sin(lidar_yaw) + py * math.cos(lidar_yaw)
-    return wx, wy
-
-
-def boundary_clearances_from_scan(
-        ranges: np.ndarray,
-        angle_min: float,
-        angle_increment: float,
-        range_min: float,
-        range_max: float,
-        x: float,
-        y: float,
-        yaw: float,
-        cg_to_lidar: float) -> tuple[float, float]:
-    """Return (left_clearance, right_clearance) in metres using body-frame lateral.
-
-    The Hokuyo is mounted with yaw=pi/2 on base_link, so scan-angle sign does NOT
-    map to vehicle left/right.  Classify hits by lateral offset in the odom frame.
-    """
-    lidar_x, lidar_y, lidar_yaw = _lidar_pose(x, y, yaw, cg_to_lidar)
-    left_x, left_y = _left_vector(yaw)
-
-    left_dists: list[float] = []
-    right_dists: list[float] = []
-
-    for i in range(len(ranges)):
-        r = float(ranges[i])
-        if not math.isfinite(r) or r < range_min or r >= range_max:
-            continue
-        angle = angle_min + i * angle_increment
-        hx, hy = _hit_xy_in_odom(angle, r, lidar_x, lidar_y, lidar_yaw)
-        lat = (hx - x) * left_x + (hy - y) * left_y
-        if lat > 0.4:
-            left_dists.append(r)
-        elif lat < -0.4:
-            right_dists.append(r)
-
-    def _robust_min(vals: list[float], default: float) -> float:
-        if not vals:
-            return default
-        return float(np.percentile(vals, 15))
-
-    return _robust_min(left_dists, TRACK_HALF_WIDTH), _robust_min(right_dists, TRACK_HALF_WIDTH)
-
-
 def _lateral_center_offset(left_clr: float, right_clr: float) -> float:
     """Shift toward the side with more clearance (positive = shift left)."""
     offset = (left_clr - right_clr) * 0.5
@@ -97,6 +42,29 @@ def _lateral_center_offset(left_clr: float, right_clr: float) -> float:
     if right_clr < MIN_WALL_DISTANCE:
         offset += (MIN_WALL_DISTANCE - right_clr) * 0.6
     return float(np.clip(offset, -MAX_LATERAL_OFFSET, MAX_LATERAL_OFFSET))
+
+
+def _gap_center_angle(angles: np.ndarray, clear: np.ndarray) -> float | None:
+    """Return the center angle of the largest contiguous arc of clear rays."""
+    if not np.any(clear):
+        return None
+    n = len(clear)
+    best_start = 0
+    best_len = 0
+    cur_start = 0
+    cur_len = 0
+    for i in range(n):
+        if clear[i]:
+            if cur_len == 0:
+                cur_start = i
+            cur_len += 1
+            if cur_len > best_len:
+                best_len = cur_len
+                best_start = cur_start
+        else:
+            cur_len = 0
+    center_idx = best_start + best_len // 2
+    return float(angles[center_idx])
 
 
 def _world_to_grid(x: float, y: float, info) -> tuple[int, int] | None:
@@ -204,25 +172,62 @@ def centerline_from_scan(
         yaw: float,
         cg_to_lidar: float,
         forward_distances: Iterable[float]) -> list[tuple[float, float]]:
-    """Build local centerline using body-frame left/right clearance."""
-    left_clr, right_clr = boundary_clearances_from_scan(
-        ranges, angle_min, angle_increment, range_min, range_max,
-        x, y, yaw, cg_to_lidar)
+    """Build local centerline by following the largest open gap in the scan.
 
-    lateral_offset = _lateral_center_offset(left_clr, right_clr)
+    For each goal distance d, the largest contiguous arc of scan rays that are
+    unobstructed at d determines the goal direction.  This handles hairpins and
+    sharp corners where a forward wall would be invisible to a lateral-offset
+    approach.
+    """
+    lidar_x, lidar_y, lidar_yaw = _lidar_pose(x, y, yaw, cg_to_lidar)
+    n = len(ranges)
 
-    fwd_x, fwd_y = forward_vector(yaw)
-    left_x, left_y = _left_vector(yaw)
-    base_x = x + cg_to_lidar * fwd_x
-    base_y = y + cg_to_lidar * fwd_y
+    angles = np.fromiter(
+        (angle_min + i * angle_increment for i in range(n)), dtype=float, count=n)
 
-    return [
-        (
-            base_x + d * fwd_x + lateral_offset * left_x,
-            base_y + d * fwd_y + lateral_offset * left_y,
-        )
-        for d in forward_distances
-    ]
+    # Treat inf/NaN and out-of-range rays as range_max (no obstacle detected).
+    r_arr = np.empty(n, dtype=float)
+    for i in range(n):
+        r = float(ranges[i])
+        if math.isfinite(r) and range_min <= r < range_max:
+            r_arr[i] = r
+        else:
+            r_arr[i] = range_max
+
+    distances = list(forward_distances)
+    nd = len(distances)
+
+    # Pass 1: compute gap angle for every distance.
+    fallback = 0.0
+    gap_angles: list[float] = []
+    for d in distances:
+        a = _gap_center_angle(angles, r_arr >= d)
+        if a is None:
+            a = fallback
+        else:
+            fallback = a
+        gap_angles.append(a)
+
+    # Anticipation: near goals inherit the corridor direction seen at a
+    # mid-range look-ahead (60th-percentile distance) so the car begins
+    # steering before the outer wall enters the close-range scan arc.
+    # Without this, gentle curves produce angle≈0 for small d (all-clear),
+    # delaying steering until the wall is nearly adjacent.
+    mid_idx = max(0, min(int(nd * 0.6), nd - 1))
+    baseline = gap_angles[mid_idx]
+
+    pts: list[tuple[float, float]] = []
+    for i, (d, ga) in enumerate(zip(distances, gap_angles)):
+        t = i / max(nd - 1, 1)          # 0 = near, 1 = far
+        angle = (1.0 - t) * baseline + t * ga
+
+        px = d * math.cos(angle)
+        py = d * math.sin(angle)
+        wx = lidar_x + px * math.cos(lidar_yaw) - py * math.sin(lidar_yaw)
+        wy = lidar_y + px * math.sin(lidar_yaw) + py * math.cos(lidar_yaw)
+        pts.append((wx, wy))
+
+    return pts
 
 
 def extract_local_centerline(
