@@ -56,15 +56,25 @@ VALID_TRACKS: FrozenSet[str] = frozenset({
 
 LAP_TIMEOUT_S = 600.0
 LAUNCH_SHUTDOWN_TIMEOUT_S = 20.0
+# pkill -f patterns: broad ROS 2 sweep + explicit stack executables.
 _HARD_RESET_PGREP_PATTERNS = (
+    'ros2',
+    '/opt/ros/',
+    'ros-args',
+    'rclcpp',
+    'rclpy',
     'ros2 launch',
     'tracker.py',
     'localplanner.py',
     'globalplanner.py',
+    'global_planner_lidar.py',
     'localisation.py',
     'lap_timer.py',
     'latency_injector.py',
     'control_manager.py',
+    'slam_toolbox',
+    'async_slam_toolbox',
+    'component_container',
     'bof',
     'odom_noise',
 )
@@ -74,6 +84,8 @@ _HARD_RESET_KILLALL = (
     'gazebo',
     'robot_state_publisher',
     'rviz2',
+    'async_slam_toolbox_node',
+    'component_container',
     'bof',
 )
 
@@ -312,17 +324,24 @@ def _run_quiet(cmd: list) -> None:
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def hard_reset_ros_sim() -> None:
-    """Kill orphaned ROS/Gazebo processes and restart the ROS 2 daemon.
-
-    Same sequence as the manual reset documented in README.md (``pkill`` /
-    ``killall`` / ``ros2 daemon stop|start``).
-    """
-    _log('hard reset between runs (ROS/Gazebo cleanup)')
+def _kill_ros_sim_processes() -> None:
+    """One pass of pkill/killall against known ROS 2 and simulator processes."""
     for pattern in _HARD_RESET_PGREP_PATTERNS:
         _run_quiet(['pkill', '-9', '-f', pattern])
     for name in _HARD_RESET_KILLALL:
         _run_quiet(['killall', '-9', name])
+
+
+def hard_reset_ros_sim() -> None:
+    """Kill all orphaned ROS 2 / Gazebo processes and restart the ROS 2 daemon.
+
+    Two pkill rounds (1 s apart) catch children that outlive their parent.
+    Same sequence as the manual reset documented in README.md.
+    """
+    _log('hard reset between runs (ROS/Gazebo cleanup)')
+    _kill_ros_sim_processes()
+    time.sleep(1.0)
+    _kill_ros_sim_processes()
 
     ros_distro = os.environ.get('ROS_DISTRO', 'humble')
     subprocess.run(
