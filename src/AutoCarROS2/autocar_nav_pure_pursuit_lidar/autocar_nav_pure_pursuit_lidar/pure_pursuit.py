@@ -79,6 +79,49 @@ def closest_waypoint_index_closed(px, py, ax, ay, start_idx=0, search_ahead=30):
     return best_idx
 
 
+def closest_waypoint_index_closed_disambiguated(
+        px: float,
+        py: float,
+        yaw: float,
+        ax,
+        ay,
+        hint_idx: int = 0,
+        behind_margin: float = 2.0) -> int:
+    """Closest waypoint on a closed loop, rejecting points strongly behind the car.
+
+    On circuits with parallel straights, plain Euclidean argmin can lock onto the
+    wrong side of the track and cubic splines then loop across the infield.
+    """
+    arr_x = np.asarray(ax, dtype=float)
+    arr_y = np.asarray(ay, dtype=float)
+    n = len(arr_x)
+    if n == 0:
+        return 0
+
+    fwd_x, fwd_y = forward_vector(yaw)
+    hint_idx = int(np.clip(hint_idx, 0, n - 1))
+    best_idx = hint_idx
+    best_score = float('inf')
+
+    for i in range(n):
+        dx = float(arr_x[i] - px)
+        dy = float(arr_y[i] - py)
+        ahead = dx * fwd_x + dy * fwd_y
+        if ahead < -behind_margin:
+            continue
+        d2 = dx * dx + dy * dy
+        score = d2 + 25.0 * max(0.0, -ahead) ** 2
+        if score < best_score:
+            best_score = score
+            best_idx = i
+
+    if best_score == float('inf'):
+        return closest_waypoint_index_closed(
+            px, py, arr_x, arr_y, hint_idx, search_ahead=n)
+
+    return best_idx
+
+
 def anchor_path_index(px, py, cx, cy, prev_idx=0, search_ahead=120, reanchor_dist=6.0):
     """Closest point on an open path; re-anchor globally if the forward window is stale."""
     n = len(cx)

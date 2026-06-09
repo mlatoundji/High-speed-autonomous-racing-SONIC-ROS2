@@ -120,3 +120,96 @@ def mean_corridor_half_width(
             grid, info, float(xs[i]), float(ys[i]), float(tangents[i]))
         widths.append(left_d + right_d)
     return float(np.mean(widths)) if widths else TRACK_HALF_WIDTH
+
+
+def _near_occupied(grid: np.ndarray, info, x: float, y: float, margin_cells: int) -> bool:
+    """Return True if any occupied cell (>50) is within margin_cells of (x, y)."""
+    col_f = (x - info.origin.position.x) / info.resolution
+    row_f = (y - info.origin.position.y) / info.resolution
+    col = int(col_f)
+    row = int(row_f)
+    h, w = grid.shape
+    if col < 0 or col >= w or row < 0 or row >= h:
+        return True  # outside grid boundary → treat as wall
+    for dc in range(-margin_cells, margin_cells + 1):
+        for dr in range(-margin_cells, margin_cells + 1):
+            c, r = col + dc, row + dr
+            if 0 <= c < w and 0 <= r < h:
+                if int(grid[r, c]) > 50:
+                    return True
+    return False
+
+
+def snap_racing_line_to_free_space(
+        xs: np.ndarray,
+        ys: np.ndarray,
+        cx: np.ndarray,
+        cy: np.ndarray,
+        grid: np.ndarray,
+        info,
+        wall_margin: float = 1.0,
+        max_iter: int = 25) -> tuple[np.ndarray, np.ndarray]:
+    """Pull any racing line point too close to an occupied cell back toward the centerline.
+
+    This guards against mincurv pushing the line through a wall that the SLAM map
+    missed (unknown cells where walls actually exist). After each move step the point
+    is re-checked; iteration stops as soon as the clearance criterion is satisfied.
+    """
+    xs = xs.copy()
+    ys = ys.copy()
+    margin_cells = max(1, int(math.ceil(wall_margin / info.resolution)))
+
+    for i in range(len(xs)):
+        for _ in range(max_iter):
+            if not _near_occupied(grid, info, float(xs[i]), float(ys[i]), margin_cells):
+                break
+            # Move 25 % toward the nearest centerline point each iteration.
+            dists = np.hypot(cx - xs[i], cy - ys[i])
+            j = int(np.argmin(dists))
+            xs[i] = xs[i] * 0.75 + cx[j] * 0.25
+            ys[i] = ys[i] * 0.75 + cy[j] * 0.25
+
+    # Remove any collapsed/coincident points the snap may have introduced so
+    # that consecutive nearly-identical vertices cannot create fold-back artefacts.
+    xs, ys = dedupe_closed_polyline(xs, ys, min_d=0.2)
+    return xs, ys
+
+
+def remove_fold_backs(
+        xs: np.ndarray,
+        ys: np.ndarray,
+        max_cos: float = -0.3) -> tuple[np.ndarray, np.ndarray]:
+    """Iteratively remove points where the path reverses direction by more than ~107°.
+
+    After Laplacian smoothing, legitimate F1 hairpins produce at most ~40° per-segment
+    angle change in the racing line (radius ≥ 5 m, step ≈ 3.5 m).  Fold-back
+    artefacts — from loop-seam overshoot or snap-induced collapses — appear as
+    single-step reversals of 120°+; max_cos = -0.3 (≈ 107°) safely separates them.
+    """
+    xs = np.asarray(xs, dtype=float).copy()
+    ys = np.asarray(ys, dtype=float).copy()
+
+    changed = True
+    while changed and len(xs) >= 4:
+        changed = False
+        n = len(xs)
+        bad: list[int] = []
+        for i in range(n):
+            p = (i - 1) % n
+            q = (i + 1) % n
+            d1x = xs[i] - xs[p]; d1y = ys[i] - ys[p]
+            d2x = xs[q] - xs[i]; d2y = ys[q] - ys[i]
+            l1 = math.hypot(d1x, d1y)
+            l2 = math.hypot(d2x, d2y)
+            if l1 < 0.1 or l2 < 0.1:
+                bad.append(i)  # degenerate (nearly-coincident) point
+            elif (d1x * d2x + d1y * d2y) / (l1 * l2) < max_cos:
+                bad.append(i)  # direction reversal > 107°
+        if bad:
+            mask = np.ones(n, dtype=bool)
+            mask[bad] = False
+            xs = xs[mask]
+            ys = ys[mask]
+            changed = True
+
+    return xs, ys
