@@ -148,6 +148,7 @@ class GlobalPlannerLidar(Node):
         self._last_racing_px: list[float] | None = None
         self._last_racing_py: list[float] | None = None
         self._racing_window_strategy: str = 'trimmed'
+        self._racing_goals_active = False
         self._racing_line_saved = False
         self._lap1_complete_time = None
 
@@ -168,12 +169,13 @@ class GlobalPlannerLidar(Node):
             if self.lap_count == 1:
                 # First lap complete: exploration done, build racing line once.
                 self._racing_line_ready = False
-                self._racing_goals_force_once = False
-                self._racing_window_strategy = 'trimmed'
+                self._racing_goals_force_once = True
+                self._racing_goals_active = False
+                self._racing_window_strategy = 'forward-only'
                 self._racing_line_saved = False
                 self._lap1_complete_time = self.get_clock().now()
                 self.get_logger().info(
-                    'Lap 1 complete — building racing line from SLAM map')
+                    'Lap 1 complete — keep exploration steering until racing line ready')
 
     def map_cb(self, msg: OccupancyGrid):
         self.map_frame_id = msg.header.frame_id or 'map'
@@ -473,11 +475,6 @@ class GlobalPlannerLidar(Node):
             self._publish_exploration_goals()
             return
 
-        # First-principles state machine: once lap 1 is done, planner stays in
-        # racing mode and never falls back to exploration goals.
-        mode_msg.data = 1
-        self.mode_pub.publish(mode_msg)
-
         can_build = True
         if self.racing_build_delay_s > 0.0 and self._lap1_complete_time is not None:
             elapsed = (self.get_clock().now() - self._lap1_complete_time).nanoseconds * 1e-9
@@ -493,18 +490,28 @@ class GlobalPlannerLidar(Node):
             self._build_thread = t
             t.start()
 
+        # Transition: keep LiDAR exploration goals + nav_mode=0 for continuous
+        # steering until the racing line is built and first racing goals publish.
+        if not self._racing_goals_active:
+            if self._racing_line_ready and self._publish_racing_goals():
+                self._racing_goals_active = True
+                mode_msg.data = 1
+                self.mode_pub.publish(mode_msg)
+                self.get_logger().info(
+                    'Lap2 steering handoff: exploration -> racing line (nav_mode=1)')
+                return
+            mode_msg.data = 0
+            self.mode_pub.publish(mode_msg)
+            self._publish_exploration_goals()
+            return
+
+        # Steady racing: never fall back to exploration goals.
+        mode_msg.data = 1
+        self.mode_pub.publish(mode_msg)
         if self._publish_racing_goals():
             return
 
-        if not self._racing_line_ready:
-            self.get_logger().info(
-                'Racing line building — holding previous goals',
-                throttle_duration_sec=2.0)
-            return
-
         if self._last_racing_px and self._last_racing_py:
-            # Keep publishing last valid racing window if live anchoring/TF
-            # fails temporarily; do not switch back to exploration goals.
             self._emit_goals(
                 self._last_racing_px,
                 self._last_racing_py,
