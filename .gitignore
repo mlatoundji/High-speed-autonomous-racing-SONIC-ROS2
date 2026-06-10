@@ -74,6 +74,8 @@ results/*
 !results/benchmark_2026-05-25T19-37-58/**
 !results/benchmark_2026-06-08T19-47-00/
 !results/benchmark_2026-06-08T19-47-00/**
+!results/benchmark_2026-06-10T10-52-32/
+!results/benchmark_2026-06-10T10-52-32/**
 !results/mpc_2026-05-25T16-46-36/
 !results/mpc_2026-05-25T16-46-36/**
 !results/mpc_racing_2026-05-25T16-56-47/
@@ -97,6 +99,9 @@ results/*
 
 # Legacy run metadata (prefer params.yaml)
 results/**/params.yml
+
+docs/images/Albert_Park_Circuit.mp4
+docs/images/Albert_Park_Circuit.gif
 
 # =============================================================================
 # Deprecated / local-only paths
