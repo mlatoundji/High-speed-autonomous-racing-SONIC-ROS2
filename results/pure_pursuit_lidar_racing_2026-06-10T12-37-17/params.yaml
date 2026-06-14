@@ -1,0 +1,75 @@
+run:
+  stack: pure_pursuit_lidar
+  run_id: 2026-06-10T12-37-17
+  started_at: '2026-06-10T12:37:17'
+  line: racing
+  profile: finetuned_perturbed_l500_n005
+  latency_ms: 500
+  odom_noise_std: 0.05
+  navigation_params_source: /media/psf/autocar/results/benchmark_2026-06-10T10-52-32/nav_overrides/run_008.yaml
+navigation:
+  localisation:
+    ros__parameters:
+      update_frequency: 50.0
+      use_slam: true
+  local_planner:
+    ros__parameters:
+      update_frequency: 10.0
+      car_width: 2.0
+      centreofgravity_to_frontaxle: 1.483
+      frame_id: base_link
+      cruise_velocity: 7.5
+      avoid_velocity: 7.5
+      exploration_velocity: 3.0
+      max_lateral_accel: 5.0
+      min_curvature: 0.012
+      curvature_lookahead: 110
+      curvature_smooth_window: 7
+      accel_rate: 4.0
+      decel_rate: 6.5
+  global_planner_lidar:
+    ros__parameters:
+      waypoints_ahead: 6
+      waypoints_behind: 1
+      passed_threshold: 0.25
+      centreofgravity_to_frontaxle: 1.483
+      waypoint_search_ahead: 35
+      exploration_goal_count: 10
+      exploration_goal_step: 3.0
+      cg_to_lidar: 2.4
+      centerline_step: 3.0
+      centerline_close_dist: 4.0
+      centerline_min_points: 20
+      centerline_post_smooth_passes: 3
+      centerline_refine_passes: 3
+      racing_use_map_corridor: true
+      racing_boundary_margin: 1.0
+      racing_mincurv_max_offset: 4.5
+      racing_mincurv_iters: 8000
+      racing_smooth_alpha: 0.42
+      racing_smooth_iters: 12
+      racing_smooth_max_dev: 1.5
+      racing_smooth_pre_iters: 5
+      racing_smooth_pre_alpha: 0.42
+      racing_smooth_coarse_points: 80
+      racing_smooth_energy_ratio: 0.05
+      racing_track_half_width: 8.0
+  path_tracker:
+    ros__parameters:
+      update_frequency: 50.0
+      centreofgravity_to_frontaxle: 1.483
+      centreofgravity_to_rearaxle: 1.483
+      wheelbase: 2.966
+      lookahead_gain: 0.48
+      lookahead_min: 1.8
+      lookahead_max: 8.0
+      lookahead_curv_extra: 4.0
+      lookahead_curv_soft: 0.1
+      closest_search_ahead: 140
+      steering_limits: 0.92
+      steering_rate_limit: 3.0
+      steer_smoothing: 1.0
+      velocity_gain: 1.0
+      startup_ramp_s: 2.0
+      lateral_soft: 4.0
+      heading_soft: 0.65

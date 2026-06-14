@@ -1,0 +1,835 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{ragged2e}
+
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+\hypersetup{
+  colorlinks = true,
+  linkcolor = black,
+  citecolor = black,
+  urlcolor = blue!60!black,
+}
+
+\title{Autonomous Racing Navigation:\\Experimental Results Summary}
+\author{AutoCar Project}
+\date{May--June 2026}
+
+\graphicspath{{../results/}}
+
+\newcommand{\runref}[1]{\texttt{results/#1}}
+\newcommand{\best}[1]{\textbf{#1}}
+\newcommand{\fail}{\textsc{timeout}}
+\newcommand{\ndash}{--}
+\newcommand{\cfg}[1]{\texttt{\small #1}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document consolidates lap-time and tracking metrics from all navigation experiments
+conducted on the AutoCar simulator.
+Experiments progress in three stages:
+(i)~algorithm selection on the \emph{circle circuit} (Stanley, MPC, Pure Pursuit),
+(ii)~Pure Pursuit tuning on the \emph{F1 circuit} (Albert Park), and
+(iii)~the same F1 circuit with the Pure Pursuit + LiDAR navigation stack,
+including robustness sweeps over perception latency and odometry noise.
+All raw data are archived under \texttt{results/}.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ---------------------------------------------------------------------------
+\section{Master Comparison Table}
+\label{sec:master}
+
+Table~\ref{tab:master} consolidates \textbf{all} recorded runs in a single view.
+Lap times from manual sessions report $T_{\min}$ (best lap) with mean\,$\pm$\,std in
+parentheses; benchmark sessions report post-warmup median $T_{\mathrm{med}}$.
+Best result per stage is marked~\best{bold}.
+Rows marked~\fail{} did not complete a measured lap within the allotted time.
+
+\begin{table}[H]
+  \centering
+  \caption{Stage~I --- Algorithm selection on the circle circuit (2026-05-25).}
+  \label{tab:master-i}
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabular}{@{}r l l r r r@{}}
+    \toprule
+    \# & Algorithm & Line &
+    $T_{\min}$ (s) & $\bar{T}\pm\sigma$ (s) & $\bar{v}$ (m/s) \\
+    \midrule
+    1 & Stanley      & centerline & 190.1 & 191.1$\pm$0.9 & 3.42 \\
+    2 & Stanley      & racing     & 172.6 & 173.1$\pm$0.7 & 3.63 \\
+    3 & MPC          & centerline & 108.9 & 111.1$\pm$2.2 & 5.89 \\
+    4 & MPC          & racing     & 108.5 & 110.4$\pm$1.8 & 5.71 \\
+    5 & Pure Pursuit & centerline &  99.9 & 105.4$\pm$4.8 & 6.23 \\
+    6 & Pure Pursuit & racing     & \best{92.5} & 95.0$\pm$2.2 & 6.63 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Stage~II --- Pure Pursuit on the F1 circuit (2026-06-08).}
+  \label{tab:master-ii}
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabular}{@{}r l l rr r r r r@{}}
+    \toprule
+    \# & Line & Profile & $L$ & $\sigma$ &
+    $T_{\mathrm{med}}$ & $\bar{v}$ & $\varepsilon_{\mathrm{rms}}$ &
+    $\dot{\delta}_{\max}$ \\
+    & & & (ms) & (m) & (s) & (m/s) & (m) & (rad/s) \\
+    \midrule
+    7  & centerline & \cfg{baseline}             & 0   & 0   &
+        174.6 & 3.52 & 0.768 & 12.46 \\
+    8  & racing     & \cfg{racing}               & 0   & 0   &
+         89.5 & 6.41 & 0.295 &  5.07 \\
+    9  & racing     & \cfg{finetuned (conservative)} & 0   & 0   &
+         \best{86.7} & 6.61 & 0.351 & \best{1.33} \\
+    10 & racing     & \cfg{finetuned (aggressive)}   & 0   & 0   &
+         \fail & \ndash & \ndash & \ndash \\
+    11 & racing     & \cfg{finetuned\_perturbed} & 200 & 0.1 &
+         98.7 & 18.55$^{\dag}$ & 0.619 & 3.00 \\
+    \bottomrule
+  \end{tabular}
+  \\[0.3em]
+  \footnotesize
+  \textit{Conservative} (\cfg{f1\_finetuned}): \texttt{cruise\_velocity}\,$=$\,8.0\,m/s,
+  \texttt{max\_lateral\_accel}\,$=$\,5.5\,m/s$^2$.
+  \textit{Aggressive} (tuning rejects, \texttt{docs/rapport\_optimisation\_f1.md}):
+  \texttt{cruise\_velocity} 9--10\,m/s and/or \texttt{max\_lateral\_accel}\,$=$\,6.5\,m/s$^2$
+  $\rightarrow$ crash or off-track, no lap-time gain; PP tracking ceilings at ${\sim}$8\,m/s.
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Stage~III --- Pure Pursuit + LiDAR on the F1 circuit (2026-06-10).}
+  \label{tab:master-iii}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}r l rr r r r r c@{}}
+    \toprule
+    \# & Profile & $L$ (ms) & $\sigma$ (m) &
+    $T_{\mathrm{med}}$ (s) & $\bar{v}$ (m/s) & $\varepsilon_{\mathrm{rms}}$ (m) &
+    $\dot{\delta}_{\max}$ (rad/s) & Off \\
+    \midrule
+    12 & \cfg{baseline}        & 0   & 0    & 125.6 & 4.17 & 0.071 &  0.80 & 0 \\
+    13 & \cfg{finetuned}       & 0   & 0    & \best{115.1} & 4.71 & 0.108 & \best{0.60} & 0 \\
+    14 & \cfg{l0\_n005}        & 0   & 0.05 & \fail & \ndash & \ndash & \ndash & \ndash \\
+    15 & \cfg{l0\_n01}         & 0   & 0.10 & 139.6 & 6.00 & 0.155 &  0.60 & 0 \\
+    16 & \cfg{l200\_n0}        & 200 & 0    & \fail & \ndash & \ndash & \ndash & \ndash \\
+    17 & \cfg{l200\_n005}      & 200 & 0.05 & 250.9 & 3.32 & 0.367 &  0.60 & 0 \\
+    18 & \cfg{l200\_n01}       & 200 & 0.10 & 501.0 & 3.84 & 0.143 &  0.60 & 0 \\
+    19 & \cfg{l500\_n0}        & 500 & 0    & \fail & \ndash & \ndash & \ndash & \ndash \\
+    20 & \cfg{l500\_n005}      & 500 & 0.05 & \fail & \ndash & \ndash & \ndash & \ndash \\
+    21 & \cfg{l500\_n01}       & 500 & 0.10 & \fail & \ndash & \ndash & \ndash & \ndash \\
+    \bottomrule
+  \end{tabular}
+  \\[0.3em]
+  \footnotesize
+  Source: \runref{benchmark\_2026-06-10T10-52-32/summary.csv};
+  $\dot{\delta}_{\max}$ from post-warmup lap~2
+  (\texttt{steering\_rate\_max} in session \texttt{lap\_times.csv}).
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Master comparison --- best lap time per stage (Tables~\ref{tab:master-i}--\ref{tab:master-iii}).}
+  \label{tab:master}
+  \begin{tabular}{@{}cllr@{}}
+    \toprule
+    Stage & Track & Stack & Best lap (s) \\
+    \midrule
+    I   & Circle circuit & Stanley / MPC / Pure Pursuit & \best{92.5} \\
+    II  & F1 circuit     & Pure Pursuit               & \best{86.7} \\
+    III & F1 circuit     & Pure Pursuit + LiDAR       & \best{115.1} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\medskip
+\noindent\footnotesize
+$^{\dag}$Stage~II perturbed run: inflated path distance (1831\,m vs.\ $\approx$573\,m)
+under localisation noise; $\bar{v}$ is not comparable to nominal runs.
+Stage~I lap column format: $T_{\min}$ $(\bar{T}\pm\sigma)$.
+Stages~II--III: $T_{\mathrm{med}}$ and $\dot{\delta}_{\max}$ from post-warmup lap~2
+(warmup lap~1 excluded from summary).
+\medskip
+
+% ---------------------------------------------------------------------------
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Tracks and navigation stacks}
+\begin{itemize}[nosep]
+  \item \textbf{Circle circuit} --- oval track used for controller comparison
+        (\runref{stanley\_2026-05-25T13-55-37}, etc.).
+        Nominal lap length from waypoint polylines
+        (\texttt{waypoints.csv} / \texttt{waypoints\_racing.csv}):
+        centerline ${\approx}$651\,m, racing line ${\approx}$627\,m.
+  \item \textbf{F1 circuit} --- Albert Park layout (scaled for simulation), used in
+        both Stage~II and Stage~III
+        (\runref{benchmark\_2026-06-08T19-47-00},
+        \runref{benchmark\_2026-06-10T10-52-32}).
+        Nominal lap length from precomputed waypoint polylines
+        (\texttt{waypoints\_f1.csv} / \texttt{waypoints\_f1\_racing.csv};
+        Stage~II only):
+        centerline ${\approx}$596\,m, racing line ${\approx}$568\,m
+        (real Melbourne GP circuit: ${\approx}$5.3\,km).
+        Stage~II employs the standard Pure Pursuit stack with these CSV paths
+        loaded at launch.
+        Stage~III employs Pure Pursuit + LiDAR: lap~1 explores via LiDAR;
+        centerline and racing line are \emph{computed online} from the SLAM map
+        and stored in memory (not read from CSV).
+        The benchmark config label \texttt{f1\_circuit\_fenced} refers to this
+        LiDAR-enabled setup on the same circuit geometry, not a separate track.
+\end{itemize}
+
+\subsection{Trajectory modes}
+\begin{itemize}[nosep]
+  \item \textbf{Stages I--II (open-loop stacks)} --- \texttt{centerline} and
+        \texttt{racing} refer to precomputed waypoint files
+        (\texttt{waypoints*.csv}) loaded at launch.
+  \item \textbf{Stage III (Pure Pursuit + LiDAR)} --- the \texttt{line} launch
+        flag selects the same nominal mode names, but trajectories are
+        \emph{computed at runtime} and held in memory:
+        lap~1 builds a local centerline from LiDAR (Follow-the-Gap) and records
+        the exploration path into the SLAM map; at lap~2 the
+        \texttt{global\_planner\_lidar} node derives a closed-loop centerline
+        from that path, optimises a min-curvature racing line, smooths it, and
+        caches the result for subsequent laps (typical lap-2+ distance
+        ${\approx}$520--540\,m in our runs, vs.\ ${\approx}$568\,m for the
+        offline \texttt{waypoints\_f1\_racing.csv}).
+\end{itemize}
+
+\subsection{Metrics}
+\begin{itemize}[nosep]
+  \item \textbf{Lap time} $T_{\mathrm{lap}}$ (s) --- elapsed time between consecutive
+        start/finish crossings.
+  \item \textbf{Average speed} $\bar{v}$ (m/s) and \textbf{peak speed}
+        $v_{\max}$ (m/s).
+  \item \textbf{Path distance} $d$ (m) --- integrated odometry over the lap.
+  \item \textbf{Lateral error RMS} $\varepsilon_{\mathrm{rms}}$ (m) and
+        \textbf{peak lateral error} $\varepsilon_{\max}$ (m) --- benchmark runs only.
+  \item \textbf{Peak steering rate} $\dot{\delta}_{\max}$ (rad/s) --- maximum
+        $|\mathrm{d}\delta/\mathrm{d}t|$ per lap (proxy for steering oscillation).
+  \item \textbf{Off-track events} --- count of boundary violations (benchmark runs only).
+\end{itemize}
+
+\subsection{Recording conventions}
+Manual launches write per-lap records to \texttt{results/<stack>\_<run\_id>/lap\_times.csv}
+(15 columns when extended metrics are enabled).
+Batch benchmarks (\texttt{scripts/benchmark.py}) aggregate results into
+\texttt{summary.csv} with one warmup lap excluded from reported statistics
+(\texttt{warmup\_laps = 1}).
+Runs that did not complete a measured lap within the allotted time are marked
+\textbf{timeout}.
+
+% ---------------------------------------------------------------------------
+\section{Algorithm Selection --- Circle Circuit}
+\label{sec:circle}
+
+Three path-tracking stacks were evaluated on the circle circuit under both
+centerline and racing trajectories.
+Sessions were recorded on 2026-05-25.
+Pure Pursuit achieved the lowest lap times and was retained for subsequent experiments.
+
+\subsection{Summary comparison}
+
+Table~\ref{tab:circle-summary} reports aggregate statistics over all recorded laps.
+Racing-line trajectories shorten the path ($\approx\!630$\,m vs.\ $\approx\!653$\,m)
+and generally reduce lap time.
+
+\begin{table}[H]
+  \centering
+  \caption{Circle-circuit algorithm comparison (2026-05-25).
+           Best lap time per trajectory mode in \best{bold}.}
+  \label{tab:circle-summary}
+  \small
+  \begin{tabular}{@{}llrrrrrrr@{}}
+    \toprule
+    Stack & Line & $n$ &
+    $\bar{T}_{\mathrm{lap}}$ & $\sigma_{T}$ &
+    $T_{\min}$ & $T_{\max}$ &
+    $\bar{v}$ & $v_{\max}$ \\
+    & & & \multicolumn{4}{c}{(s)} & \multicolumn{2}{c}{(m/s)} \\
+    \midrule
+    Stanley   & centerline & 3 & 191.1 & 0.9 & 190.1 & 191.8 & 3.42 & 5.85 \\
+    Stanley   & racing     & 2 & 173.1 & 0.7 & 172.6 & 173.6 & 3.63 & 5.91 \\
+    \addlinespace
+    MPC       & centerline & 3 & 111.1 & 2.2 & \best{108.9} & 113.2 & 5.89 & 7.58 \\
+    MPC       & racing     & 5 & 110.4 & 1.8 & \best{108.5} & 113.0 & 5.71 & 7.56 \\
+    \addlinespace
+    Pure Pursuit & centerline & 3 & 105.4 & 4.8 & 99.9  & 109.0 & 6.23 & 7.60 \\
+    Pure Pursuit & racing     & 3 & \best{95.0}  & 2.2 & \best{92.5}  & 96.8  & 6.63 & 7.67 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Racing-line speedup over centerline}
+
+\begin{table}[H]
+  \centering
+  \caption{Racing-line improvement relative to centerline on the circle circuit.}
+  \label{tab:circle-speedup}
+  \begin{tabular}{@{}lrrr@{}}
+    \toprule
+    Stack & $\bar{T}_{\mathrm{center}}$ (s) & $\bar{T}_{\mathrm{racing}}$ (s) &
+    $\Delta T\;(\%)$ \\
+    \midrule
+    Stanley      & 191.1 & 173.1 & $-$9.4 \\
+    MPC          & 111.1 & 110.4 & $-$0.6 \\
+    Pure Pursuit & 105.4 &  95.0 & \best{$-$9.8} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Per-lap records}
+
+\subsubsection{Stanley}
+\begin{table}[H]
+  \centering
+  \caption{Stanley --- circle circuit.
+           Source: \runref{stanley\_2026-05-25T13-55-37} (centerline),
+           \runref{stanley\_racing\_2026-05-25T13-48-10} (racing).}
+  \label{tab:stanley-laps}
+  \small
+  \begin{tabular}{@{}llrrrr@{}}
+    \toprule
+    Line & Lap & $T_{\mathrm{lap}}$ (s) & $\bar{v}$ (m/s) & $v_{\max}$ (m/s) & $d$ (m) \\
+    \midrule
+    centerline & 1 & 191.3 & 3.41 & 5.83 & 652.5 \\
+    centerline & 2 & 190.1 & 3.43 & 5.85 & 652.5 \\
+    centerline & 3 & 191.8 & 3.40 & 5.84 & 652.8 \\
+    \addlinespace
+    racing     & 1 & 172.6 & 3.64 & 5.83 & 628.3 \\
+    racing     & 2 & 173.6 & 3.62 & 5.91 & 628.6 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{MPC}
+\begin{table}[H]
+  \centering
+  \caption{MPC --- circle circuit.
+           Source: \runref{mpc\_2026-05-25T16-46-36} (centerline),
+           \runref{mpc\_racing\_2026-05-25T16-56-47} (racing).}
+  \label{tab:mpc-laps}
+  \small
+  \begin{tabular}{@{}llrrrr@{}}
+    \toprule
+    Line & Lap & $T_{\mathrm{lap}}$ (s) & $\bar{v}$ (m/s) & $v_{\max}$ (m/s) & $d$ (m) \\
+    \midrule
+    centerline & 1 & 113.2 & 5.78 & 7.46 & 653.9 \\
+    centerline & 2 & 111.1 & 5.89 & 7.58 & 654.0 \\
+    centerline & 3 & 108.9 & 6.00 & 7.41 & 653.6 \\
+    \addlinespace
+    racing     & 1 & 113.0 & 5.58 & 7.31 & 630.6 \\
+    racing     & 2 & 108.5 & 5.80 & 7.51 & 629.7 \\
+    racing     & 3 & 110.4 & 5.71 & 7.45 & 630.2 \\
+    racing     & 4 & 110.8 & 5.69 & 7.49 & 630.3 \\
+    racing     & 5 & 109.1 & 5.78 & 7.56 & 630.1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Pure Pursuit (selected algorithm)}
+\begin{table}[H]
+  \centering
+  \caption{Pure Pursuit --- circle circuit.
+           Source: \runref{pure\_pursuit\_2026-05-25T16-28-02} (centerline),
+           \runref{pure\_pursuit\_racing\_2026-05-25T16-34-12} (racing).}
+  \label{tab:pp-laps}
+  \small
+  \begin{tabular}{@{}llrrrr@{}}
+    \toprule
+    Line & Lap & $T_{\mathrm{lap}}$ (s) & $\bar{v}$ (m/s) & $v_{\max}$ (m/s) & $d$ (m) \\
+    \midrule
+    centerline & 1 & 99.9  & 6.55 & 7.60 & 654.1 \\
+    centerline & 2 & 107.2 & 6.12 & 7.56 & 656.4 \\
+    centerline & 3 & 109.0 & 6.03 & 7.58 & 657.2 \\
+    \addlinespace
+    racing     & 1 & 96.8  & 6.51 & 7.52 & 629.7 \\
+    racing     & 2 & 95.7  & 6.58 & 7.50 & 629.5 \\
+    racing     & 3 & 92.5  & 6.80 & 7.67 & 629.0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Selection outcome}
+Pure Pursuit delivered the \best{fastest best lap} (92.5\,s, racing line)
+and the \best{largest racing-line gain} ($-$9.8\%).
+Stanley was approximately 80\,s slower per lap; MPC was competitive on
+centerline but did not outperform Pure Pursuit.
+Pure Pursuit was therefore chosen for all F1-circuit experiments.
+
+% ---------------------------------------------------------------------------
+\section{F1 Circuit --- Pure Pursuit Progression}
+\label{sec:f1}
+
+Four configurations were benchmarked on the Albert Park F1 circuit on 2026-06-08
+(\runref{benchmark\_2026-06-08T19-47-00}).
+Each run completed two laps with one warmup lap excluded from the summary.
+
+\begin{table}[H]
+  \centering
+  \caption{Pure Pursuit on the F1 circuit: baseline, racing line, parameter finetuning,
+           and finetuned stack under injected latency/noise.
+           Source: \runref{benchmark\_2026-06-08T19-47-00/summary.csv}.}
+  \label{tab:f1-progression}
+  \small
+  \begin{tabular}{@{}llrrrrrrrr@{}}
+    \toprule
+    Profile & Line &
+    Lat.\ (ms) & Odom.\ $\sigma$ &
+    $T_{\mathrm{med}}$ (s) & $\bar{v}$ (m/s) & $v_{\max}$ (m/s) &
+    $\varepsilon_{\mathrm{rms}}$ (m) & $\dot{\delta}_{\max}$ (rad/s) & Off \\
+    \midrule
+    baseline             & centerline & 0   & 0.0  &
+        174.6 & 3.52 & 7.54 & 0.768 & 12.46 & 0 \\
+    racing               & racing     & 0   & 0.0  &
+         89.5 & 6.41 & 7.63 & 0.295 &  5.07 & 0 \\
+    finetuned            & racing     & 0   & 0.0  &
+         \best{86.7} & 6.61 & 7.69 & 0.351 & \best{1.33} & 0 \\
+    finetuned\_perturbed & racing     & 200 & 0.1  &
+         98.7 & 18.55$^{\dag}$ & 7.32 & 0.619 & 3.00 & 0 \\
+    \bottomrule
+  \end{tabular}
+  \\[0.4em]
+  \footnotesize $^{\dag}$Elevated $\bar{v}$ reflects inflated path distance
+  (1831\,m vs.\ $\approx$573\,m) under perturbation, not higher
+  on-track speed.
+\end{table}
+
+\subsection{Per-lap records}
+
+Table~\ref{tab:f1-laps} lists both laps for each Stage~II run
+(warmup lap~1, measured lap~2).
+Sources: \runref{pure\_pursuit\_2026-06-08T19-47-06} (baseline),
+\runref{pure\_pursuit\_racing\_2026-06-08T19-53-41} (racing),
+\runref{pure\_pursuit\_racing\_2026-06-08T19-57-17} (finetuned),
+\runref{pure\_pursuit\_racing\_2026-06-08T20-00-46} (perturbed).
+
+\begin{table}[H]
+  \centering
+  \caption{F1 circuit --- per-lap records (2026-06-08).}
+  \label{tab:f1-laps}
+  \footnotesize
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{@{}ll r r r r r r@{}}
+    \toprule
+    Profile & Lap & $T_{\mathrm{lap}}$ & $\bar{v}$ & $v_{\max}$ &
+    $\varepsilon_{\mathrm{rms}}$ & $\dot{\delta}_{\max}$ & Off \\
+    & & (s) & (m/s) & (m/s) & (m) & (rad/s) & \\
+    \midrule
+    baseline  & 1 & 169.2 & 3.61 & 7.65 & 0.711 &  7.71 & 0 \\
+    baseline  & 2 & 174.6 & 3.52 & 7.54 & 0.768 & 12.46 & 0 \\
+    \addlinespace
+    racing    & 1 &  95.6 & 6.04 & 7.66 & 0.561 & 14.79 & 0 \\
+    racing    & 2 &  89.5 & 6.41 & 7.63 & 0.295 &  5.07 & 0 \\
+    \addlinespace
+    finetuned & 1 &  87.8 & 6.52 & 7.74 & 0.359 &  0.80 & 0 \\
+    finetuned & 2 &  \best{86.7} & 6.61 & 7.69 & 0.351 & \best{1.33} & 0 \\
+    \addlinespace
+    perturbed & 1 &  99.9 & 18.49 & 7.32 & 0.677 &  3.71 & 0 \\
+    perturbed & 2 &  98.7 & 18.55 & 7.32 & 0.619 &  3.00 & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Finetuned profile --- parameter changes (Stage~II)}
+\label{sec:f1-finetuned-params-ii}
+
+Navigation overrides are archived under
+\runref{benchmark\_2026-06-08T19-47-00/nav\_overrides/}
+(materialised from \texttt{scripts/configs/f1\_circuit.yaml}).
+The open-loop Pure Pursuit stack uses precomputed waypoints; the
+\cfg{finetuned} profile (\cfg{f1\_finetuned}) builds on \cfg{racing}
+(\cfg{f1\_racing}) with one additional path-tracker change
+(Table~\ref{tab:f1-finetuned-delta}).
+Stage~III finetuned parameters (LiDAR stack) are documented separately in
+Section~\ref{sec:f1-finetuned-params-iii} --- the same profile name, but a
+different tuning set.
+
+\begin{table}[H]
+  \centering
+  \caption{Stage~II parameter deltas for the F1 finetuned profile
+           (canonical: \texttt{f1\_circuit.yaml};
+           archived as \texttt{run\_001} \cfg{f1\_baseline},
+           \texttt{run\_002} \cfg{f1\_racing},
+           \texttt{run\_003} \cfg{f1\_finetuned}).}
+  \label{tab:f1-finetuned-delta}
+  \footnotesize
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabularx}{\textwidth}{@{}%
+    P{3.6cm}
+    >{\centering\arraybackslash}p{1.35cm}
+    >{\centering\arraybackslash}p{1.35cm}
+    >{\centering\arraybackslash}p{1.35cm}
+    Y@{}}
+    \toprule
+    Parameter & Baseline & Racing & Finetuned & Role \\
+    \midrule
+    Trajectory (\texttt{line}) &
+    centerline & racing & racing &
+    Switch to the min-curvature QP racing line
+    (\texttt{waypoints\_f1\_racing.csv}), smoothed offline
+    (\texttt{smooth\_racing\_line.py}). \\
+    \addlinespace
+    \texttt{curvature\_lookahead} &
+    140 & 60 & 60 &
+    Shorter bend-detection horizon on the twisty F1 layout:
+    brake later instead of treating the whole circuit as one continuous corner. \\
+    \addlinespace
+    \texttt{heading\_soft} &
+    0.6 & 1.2 & 1.2 &
+    Relax heading-error penalty so throttle is not crushed in corners
+    (baseline setting cut speed to $\approx$16\% of target). \\
+    \addlinespace
+    \texttt{lookahead\_curv\_extra} &
+    0 & 0 & 3.0\,m &
+    \textbf{Finetuned-only:} add extra lookahead on straights only;
+    suppresses high-speed zigzag without widening lookahead in corners. \\
+    \addlinespace
+    \texttt{lookahead\_gain} / \texttt{lookahead\_min} &
+    0.4 / 1.5 & 0.3 / 1.0 & 0.3 / 1.0 &
+    Stack default Pure Pursuit gains shortened for F1 tight corners
+    ($L_d$ at 8\,m/s: 4.7\,m $\rightarrow$ 3.4\,m). \\
+    \bottomrule
+  \end{tabularx}
+  \\[0.3em]
+  \footnotesize Baseline column: stack defaults
+  (\texttt{navigation\_params.yaml}).
+  The \cfg{f1\_baseline} run also uses 0.3 / 1.0 in
+  \texttt{f1\_circuit.yaml} (F1 circuit override applied before
+  racing-line / finetuning steps).
+\end{table}
+
+\noindent\textbf{Incremental change (\cfg{racing} $\rightarrow$ \cfg{finetuned}).}
+Only \texttt{lookahead\_curv\_extra} differs between \texttt{run\_002} and
+\texttt{run\_003}; it accounts for the 3.1\% lap-time gain
+(89.5\,s $\rightarrow$ 86.7\,s) and the drop in $\dot{\delta}_{\max}$
+(5.07 $\rightarrow$ 1.33\,rad/s).
+All other navigation parameters are identical between the two profiles.
+\cfg{f1\_finetuned\_perturbed} reuses the \cfg{f1\_finetuned} navigation
+block; only \texttt{latency\_ms}\,$=$\,200 and
+\texttt{odom\_noise\_std}\,$=$\,0.1 differ.
+
+\subsection{Key observations}
+\begin{enumerate}[nosep]
+  \item Switching from centerline to racing line on F1 cuts median lap time by
+        49\% (174.6\,s $\rightarrow$ 89.5\,s).
+  \item Parameter finetuning yields a further 3.1\% reduction
+        (89.5\,s $\rightarrow$ \best{86.7\,s}).
+  \item Under 200\,ms latency and odometry noise
+        ($\sigma = 0.1$\,m), the finetuned controller remains stable (zero off-track
+        events) but lap time increases by 13.8\% and path distance
+        diverges, indicating degraded localisation.
+  \item Lateral tracking improves markedly with the racing line:
+        $\varepsilon_{\mathrm{rms}}$ drops from 0.768\,m (centerline) to
+        0.295\,m (racing).
+  \item Parameter finetuning also smooths steering: peak steering rate on the
+        measured lap falls from 5.07\,rad/s (racing) to \best{1.33\,rad/s}
+        (finetuned), a $-$74\% reduction in steering-rate spikes.
+\end{enumerate}
+
+% ---------------------------------------------------------------------------
+\section{F1 Circuit --- Pure Pursuit with LiDAR Stack}
+\label{sec:f1-lidar}
+
+Stage~III reuses the same F1 circuit as Stage~II, but switches to the
+Pure Pursuit + LiDAR navigation stack, which constrains the vehicle to
+LiDAR-detected track boundaries.
+Ten configurations were evaluated on 2026-06-10
+(\runref{benchmark\_2026-06-10T10-52-32}), sweeping perception latency
+$L \in \{0,\,200,\,500\}$\,ms and odometry noise
+$\sigma \in \{0,\,0.05,\,0.1\}$\,m.
+
+\subsection{Nominal conditions ($L = 0$, $\sigma = 0$)}
+
+\begin{table}[H]
+  \centering
+  \caption{Pure Pursuit + LiDAR under nominal sensing on the F1 circuit (racing line).}
+  \label{tab:lidar-nominal}
+  \small
+  \begin{tabular}{@{}lrrrrrrr@{}}
+    \toprule
+    Profile & $T_{\mathrm{med}}$ (s) & $\bar{v}$ (m/s) & $v_{\max}$ (m/s) &
+    $d$ (m) & $\varepsilon_{\mathrm{rms}}$ (m) &
+    $\dot{\delta}_{\max}$ (rad/s) & Off-track \\
+    \midrule
+    baseline  & 125.6 & 4.17 & 5.77 & 523.4 & 0.071 & 0.80 & 0 \\
+    finetuned & \best{115.1} & 4.71 & 7.25 & 542.1 & 0.108 & \best{0.60} & 0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Finetuning reduces lap time by 8.4\% while maintaining sub-0.11\,m
+lateral error RMS and lowering peak steering rate from 0.80 to
+\best{0.60\,rad/s} on lap~2 ($-$25\%).
+Parameter changes vs.\ baseline are listed in
+Table~\ref{tab:lidar-finetuned-delta}.
+
+\subsection{Finetuned profile --- parameter changes (Stage~III)}
+\label{sec:f1-finetuned-params-iii}
+
+Stage~III uses the Pure Pursuit + LiDAR stack: lap~1 builds a SLAM map
+and extracts a smoothed racing line; lap~2+ races on that online trajectory.
+Overrides are archived under
+\runref{benchmark\_2026-06-10T10-52-32/nav\_overrides/}
+(\texttt{run\_000} baseline, \texttt{run\_001} finetuned;
+source config \texttt{f1\_pure\_pursuit\_lidar.yaml}).
+Unlike Stage~II, finetuning here retunes \emph{all three} navigation nodes
+(local planner, LiDAR global planner, path tracker).
+
+\begin{table}[H]
+  \centering
+  \caption{Stage~III parameter deltas for the F1 finetuned profile
+           (Pure Pursuit + LiDAR; baseline vs.\ finetuned).}
+  \label{tab:lidar-finetuned-delta}
+  \footnotesize
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabularx}{\textwidth}{@{}%
+    P{4.2cm}
+    >{\centering\arraybackslash}p{1.5cm}
+    >{\centering\arraybackslash}p{1.5cm}
+    Y@{}}
+    \toprule
+    Parameter & Baseline & Finetuned & Role \\
+    \midrule
+    \multicolumn{4}{@{}l}{\textit{local\_planner}} \\
+    \addlinespace
+    \textbf{\texttt{cruise\_velocity} /
+    \texttt{avoid\_velocity}} &
+    6.0 & \best{7.5\,m/s} &
+    Raise lap-2+ target speed; baseline was conservative for SLAM exploration. \\
+    \addlinespace
+    \texttt{max\_lateral\_accel} &
+    4.5 & 5.0 &
+    Allow slightly higher cornering speed; 5.5 was too nervous on this stack. \\
+    \addlinespace
+    \textbf{\texttt{curvature\_lookahead}} &
+    140 & \best{110} &
+    Shorten bend horizon (Stage~II used 60, but here 60 caused lap-2 speed bobbing). \\
+    \addlinespace
+    \texttt{curvature\_smooth\_window} &
+    5 & 7 &
+    Smooth cruise-velocity transitions when curvature estimate changes. \\
+    \addlinespace
+    \texttt{decel\_rate} &
+    6.0 & 6.5 &
+    Slightly faster braking into corners at higher cruise speed. \\
+    \midrule
+    \multicolumn{4}{@{}l}{\textit{global\_planner\_lidar}} \\
+    \addlinespace
+    \texttt{waypoints\_ahead} /
+    \texttt{waypoints\_behind} &
+    5 / 2 & 6 / 1 &
+    More lookahead spline goals, fewer behind --- smoother path at lap seam. \\
+    \addlinespace
+    \texttt{waypoint\_search\_ahead} &
+    30 & 35 &
+    Wider index search for stable goal selection at 7.5\,m/s. \\
+    \addlinespace
+    \textbf{\texttt{centerline\_step}} &
+    3.5 & \best{3.0\,m} &
+    Denser lap-1 exploration path $\rightarrow$ better online racing line. \\
+    \addlinespace
+    \texttt{racing\_mincurv\_max\_offset} &
+    5.0 & 4.5\,m &
+    Less aggressive corner cutting on the min-curvature racing line. \\
+    \addlinespace
+    \texttt{racing\_smooth\_iters} /
+    \texttt{racing\_smooth\_pre\_iters} &
+    10 / 4 & 12 / 5 &
+    Extra smoothing of the SLAM-derived racing trajectory. \\
+    \addlinespace
+    \texttt{racing\_smooth\_alpha} /
+    \texttt{racing\_smooth\_pre\_alpha} &
+    0.40 & 0.42 &
+    Slightly stronger smoothing blend on extracted waypoints. \\
+    \midrule
+    \multicolumn{4}{@{}l}{\textit{path\_tracker}} \\
+    \addlinespace
+    \textbf{\texttt{lookahead\_gain} /
+    \texttt{lookahead\_min} /
+    \texttt{lookahead\_max}} &
+    0.4 / 1.5 / 6.0 & \best{0.48 / 1.8 / 8.0} &
+    Longer adaptive lookahead at 7.5\,m/s ($L_d \approx 5.4$\,m) to cut zigzag. \\
+    \addlinespace
+    \textbf{\texttt{lookahead\_curv\_extra}} &
+    0 & \best{4.0\,m} &
+    Straight-only lookahead extension (Stage~II: 3.0\,m; higher speed needs more). \\
+    \addlinespace
+    \texttt{lookahead\_curv\_soft} &
+    0.08 & 0.10 &
+    Ignore high-frequency spline-curvature noise when adapting lookahead. \\
+    \addlinespace
+    \texttt{closest\_search\_ahead} &
+    120 & 140 &
+    Stabilise closest-point index at higher lap speed. \\
+    \addlinespace
+    \texttt{steering\_limits} &
+    0.95 & 0.92 &
+    Lower steering cap to suppress peak steering commands. \\
+    \addlinespace
+    \texttt{heading\_soft} &
+    0.6 & 0.65 &
+    Mild heading-penalty relax (Stage~II used 1.2; here throttle modulation
+    did not fix zigzag). \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent\textbf{Perturbed profiles (\cfg{finetuned\_perturbed\_*}).}
+The eight sweep runs share the same navigation block as \cfg{finetuned};
+only \texttt{latency\_ms} and \texttt{odom\_noise\_std} differ
+($L \in \{0,200,500\}$\,ms, $\sigma \in \{0,0.05,0.1\}$\,m).
+
+\noindent\textbf{Unchanged on purpose (both stages).}
+\texttt{steer\_smoothing} stays at 1.0 (off): low-pass filtering amplifies
+oscillation via phase lag.
+Stage~III keeps \texttt{exploration\_velocity} at 3.0\,m/s for a stable
+lap-1 SLAM pass.
+
+\subsection{Robustness sweep}
+
+\begin{table}[H]
+  \centering
+  \caption{Pure Pursuit + LiDAR robustness matrix.
+           \fail{} = run timed out before completing a measured lap.
+           Source: \runref{benchmark\_2026-06-10T10-52-32/summary.csv}.}
+  \label{tab:lidar-sweep}
+  \footnotesize
+  \begin{tabular}{@{}lrrrrrrrr@{}}
+    \toprule
+    Profile & $L$ (ms) & $\sigma$ (m) &
+    Status & $T_{\mathrm{med}}$ (s) & $\bar{v}$ (m/s) &
+    $\varepsilon_{\mathrm{rms}}$ (m) & $\dot{\delta}_{\max}$ (rad/s) & Off-track \\
+    \midrule
+    finetuned\_perturbed\_l0\_n005   &   0 & 0.05 & \fail      & \ndash & \ndash & \ndash & \ndash & \ndash \\
+    finetuned\_perturbed\_l0\_n01    &   0 & 0.10 & OK         & 139.6 & 6.00 & 0.155 & 0.60 & 0 \\
+    finetuned\_perturbed\_l200\_n0   & 200 & 0.00 & \fail      & \ndash & \ndash & \ndash & \ndash & \ndash \\
+    finetuned\_perturbed\_l200\_n005 & 200 & 0.05 & OK         & 250.9 & 3.32 & 0.367 & 0.60 & 0 \\
+    finetuned\_perturbed\_l200\_n01  & 200 & 0.10 & OK         & 501.0 & 3.84 & 0.143 & 0.60 & 0 \\
+    finetuned\_perturbed\_l500\_n0   & 500 & 0.00 & \fail      & \ndash & \ndash & \ndash & \ndash & \ndash \\
+    finetuned\_perturbed\_l500\_n005 & 500 & 0.05 & \fail      & \ndash & \ndash & \ndash & \ndash & \ndash \\
+    finetuned\_perturbed\_l500\_n01  & 500 & 0.10 & \fail      & \ndash & \ndash & \ndash & \ndash & \ndash \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Robustness summary}
+\begin{itemize}[nosep]
+  \item \textbf{Latency sensitivity:} all 500\,ms configurations timed out.
+        At 200\,ms, only runs with $\sigma > 0$ completed; pure-latency
+        injection ($L{=}200$\,ms, $\sigma{=}0$) failed.
+  \item \textbf{Noise-only perturbation} ($L{=}0$): moderate noise ($\sigma{=}0.05$\,m)
+        caused timeout; $\sigma{=}0.10$\,m completed with
+        $T_{\mathrm{med}} = 139.6$\,s (+21\% vs.\ finetuned nominal).
+  \item \textbf{Combined perturbation} ($L{=}200$\,ms): lap times scale severely
+        (250.9\,s at $\sigma{=}0.05$\,m;
+        501.0\,s at $\sigma{=}0.10$\,m), yet no off-track events were recorded.
+  \item \textbf{Best LiDAR result:} finetuned profile,
+        \best{115.1\,s} median lap under nominal sensing.
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section{Cross-Experiment Comparison}
+\label{sec:cross}
+
+Table~\ref{tab:master} (Section~\ref{sec:master}) summarises the best lap time per stage;
+Tables~\ref{tab:master-i}--\ref{tab:master-iii} list all individual runs.
+Direct comparison across stages is indicative only --- the circle and F1 circuits
+differ in layout; Stages~II and~III share the same F1 circuit but use different
+navigation stacks.
+
+\begin{table}[H]
+  \centering
+  \caption{Best lap times by experimental stage (same as Table~\ref{tab:master}).}
+  \label{tab:cross-best}
+  \begin{tabular}{@{}llrrl@{}}
+    \toprule
+    Stage & Track & Stack & Best $T_{\mathrm{lap}}$ (s) & Source \\
+    \midrule
+    Algorithm selection & circle     & Pure Pursuit         & 92.5  & \runref{pure\_pursuit\_racing\_2026-05-25T16-34-12} \\
+    F1 progression      & F1 circuit & Pure Pursuit         & 86.7  & \runref{pure\_pursuit\_racing\_2026-06-08T19-57-17} \\
+    F1 + LiDAR          & F1 circuit & Pure Pursuit + LiDAR & 115.1 & \runref{benchmark\_2026-06-10T10-52-32} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------------
+\section{Conclusions}
+\label{sec:conclusions}
+
+\begin{enumerate}
+  \item \textbf{Algorithm:} Pure Pursuit outperformed Stanley and MPC on the circle
+        circuit, achieving a best lap of 92.5\,s on the racing line.
+  \item \textbf{Racing line:} switching from centerline to racing consistently reduces
+        lap time ($-$9.8\% on circle; $-$49\% on F1).
+  \item \textbf{F1 finetuning:} parameter tuning on Pure Pursuit yields
+        \best{86.7\,s} on the F1 circuit (Stage~II) --- the overall best result ---
+        and reduces peak steering rate from 5.07 to 1.33\,rad/s ($-$74\%).
+  \item \textbf{LiDAR stack:} switching from Pure Pursuit to Pure Pursuit + LiDAR
+        on the same F1 circuit increases lap time by $\approx$28\,s
+        (115.1\,s vs.\ 86.7\,s, both finetuned, racing line), but peak steering
+        rate stays low (0.60\,rad/s vs.\ 1.33\,rad/s in Stage~II).
+  \item \textbf{Robustness:} the LiDAR stack tolerates moderate combined perturbation
+        without off-track events, but 500\,ms latency is beyond the
+        operational envelope; 200\,ms combined with noise degrades
+        performance substantially.
+\end{enumerate}
+
+% ---------------------------------------------------------------------------
+\appendix
+\section{Data Index}
+\label{app:data}
+
+\begin{table}[H]
+  \centering
+  \caption{Result directories referenced in this report.}
+  \label{tab:data-index}
+  \small
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Experiment & Directory & Date \\
+    \midrule
+    Stanley, circle, centerline       & \runref{stanley\_2026-05-25T13-55-37}           & 2026-05-25 \\
+    Stanley, circle, racing           & \runref{stanley\_racing\_2026-05-25T13-48-10}   & 2026-05-25 \\
+    MPC, circle, centerline         & \runref{mpc\_2026-05-25T16-46-36}               & 2026-05-25 \\
+    MPC, circle, racing               & \runref{mpc\_racing\_2026-05-25T16-56-47}       & 2026-05-25 \\
+    Pure Pursuit, circle, centerline  & \runref{pure\_pursuit\_2026-05-25T16-28-02}     & 2026-05-25 \\
+    Pure Pursuit, circle, racing      & \runref{pure\_pursuit\_racing\_2026-05-25T16-34-12} & 2026-05-25 \\
+    PP, F1 baseline (centerline)      & \runref{pure\_pursuit\_2026-06-08T19-47-06}         & 2026-06-08 \\
+    PP, F1 racing line                & \runref{pure\_pursuit\_racing\_2026-06-08T19-53-41} & 2026-06-08 \\
+    PP, F1 finetuned                  & \runref{pure\_pursuit\_racing\_2026-06-08T19-57-17} & 2026-06-08 \\
+    PP, F1 finetuned + perturbation   & \runref{pure\_pursuit\_racing\_2026-06-08T20-00-46} & 2026-06-08 \\
+    PP, F1 benchmark (aggregate)      & \runref{benchmark\_2026-06-08T19-47-00}             & 2026-06-08 \\
+    Pure Pursuit + LiDAR, F1 circuit  & \runref{benchmark\_2026-06-10T10-52-32}             & 2026-06-10 \\
+    PP + LiDAR session runs ($\times$10)     & \runref{benchmark\_2026-06-10T10-52-32/summary.csv} (\texttt{run\_dir}) & 2026-06-10 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\end{document}

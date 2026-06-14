@@ -1,0 +1,26 @@
+\contentsline {section}{\numberline {1}Master Comparison Table}{3}{section.1}%
+\contentsline {section}{\numberline {2}Experimental Setup}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Tracks and navigation stacks}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Trajectory modes}{4}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Metrics}{4}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Recording conventions}{4}{subsection.2.4}%
+\contentsline {section}{\numberline {3}Algorithm Selection --- Circle Circuit}{4}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Summary comparison}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Racing-line speedup over centerline}{5}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Per-lap records}{5}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}Stanley}{5}{subsubsection.3.3.1}%
+\contentsline {subsubsection}{\numberline {3.3.2}MPC}{6}{subsubsection.3.3.2}%
+\contentsline {subsubsection}{\numberline {3.3.3}Pure Pursuit (selected algorithm)}{6}{subsubsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.4}Selection outcome}{6}{subsection.3.4}%
+\contentsline {section}{\numberline {4}F1 Circuit --- Pure Pursuit Progression}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Per-lap records}{6}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Finetuned profile --- parameter changes (Stage~II)}{7}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Key observations}{7}{subsection.4.3}%
+\contentsline {section}{\numberline {5}F1 Circuit --- Pure Pursuit with LiDAR Stack}{8}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Nominal conditions ($L = 0$, $\sigma = 0$)}{8}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Finetuned profile --- parameter changes (Stage~III)}{8}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Robustness sweep}{10}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Robustness summary}{10}{subsection.5.4}%
+\contentsline {section}{\numberline {6}Cross-Experiment Comparison}{10}{section.6}%
+\contentsline {section}{\numberline {7}Conclusions}{10}{section.7}%
+\contentsline {section}{\numberline {A}Data Index}{11}{appendix.A}%

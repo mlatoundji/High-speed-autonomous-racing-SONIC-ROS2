@@ -71,7 +71,7 @@
         heading_soft: 0.6
 
 - stack: pure_pursuit
-  profile: f1_centerline
+  profile: f1_racing
   track: f1_circuit
   line: racing
   latency_ms: 0

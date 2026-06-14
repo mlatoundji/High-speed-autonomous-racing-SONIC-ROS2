@@ -1,0 +1,3 @@
+session_id,lap_number,timestamp_iso,duration_s,avg_speed_mps,max_speed_mps,distance_m,controller,profile,latency_ms,odom_noise_std,lateral_error_rms,lateral_error_max,steering_rate_max,offtrack_events
+2026-06-08T19-47-06,1,2026-06-08T19:50:18,169.200,3.607,7.653,610.30,pure_pursuit,f1_baseline,0,0.0000,0.7112,2.3924,7.7104,0
+2026-06-08T19-47-06,2,2026-06-08T19:53:31,174.600,3.517,7.535,614.04,pure_pursuit,f1_baseline,0,0.0000,0.7678,2.6445,12.4578,0
