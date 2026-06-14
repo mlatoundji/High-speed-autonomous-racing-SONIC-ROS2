@@ -27,7 +27,7 @@ flowchart TB
     LOC["localisation<br/>/autocar/state2D_raw"]
     S2D["/autocar/state2D<br/>(after optional injectors)"]
 
-    subgraph stack ["Navigation stack (this package)"]
+    subgraph stack ["Navigation stack"]
         GPL["global_planner_lidar<br/>→ /autocar/goals · /autocar/nav_mode"]
         LP["local_planner<br/>→ /autocar/path · /autocar/target_velocity"]
         TRK["path_tracker<br/>→ /autocar/auto_cmd_vel"]

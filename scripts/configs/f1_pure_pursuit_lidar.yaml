@@ -18,82 +18,82 @@
 # Requires lap_count >= 2: lap 1 builds the SLAM map (exploration), lap 2+ races on
 # the smoothed racing line extracted from that map.
 
-- stack: pure_pursuit_lidar
-  profile: baseline
-  track: f1_circuit_fenced
-  line: racing
-  latency_ms: 0
-  odom_noise_std: 0.0
-  lap_count: 2
-  warmup_laps: 1
-  camera: false
-  navigation:
-    localisation:
-      ros__parameters:
-        update_frequency: 50.0
-        use_slam: true
+# - stack: pure_pursuit_lidar
+#   profile: baseline
+#   track: f1_circuit_fenced
+#   line: racing
+#   latency_ms: 0
+#   odom_noise_std: 0.0
+#   lap_count: 2
+#   warmup_laps: 1
+#   camera: false
+#   navigation:
+#     localisation:
+#       ros__parameters:
+#         update_frequency: 50.0
+#         use_slam: true
 
-    local_planner:
-      ros__parameters:
-        update_frequency: 10.0
-        car_width: 2.0
-        centreofgravity_to_frontaxle: 1.483
-        frame_id: "base_link"
-        cruise_velocity: 6.0
-        avoid_velocity: 6.0
-        exploration_velocity: 3.0
-        max_lateral_accel: 4.5
-        min_curvature: 0.012
-        curvature_lookahead: 140
-        curvature_smooth_window: 5
-        accel_rate: 4.0
-        decel_rate: 6.0
+#     local_planner:
+#       ros__parameters:
+#         update_frequency: 10.0
+#         car_width: 2.0
+#         centreofgravity_to_frontaxle: 1.483
+#         frame_id: "base_link"
+#         cruise_velocity: 6.0
+#         avoid_velocity: 6.0
+#         exploration_velocity: 3.0
+#         max_lateral_accel: 4.5
+#         min_curvature: 0.012
+#         curvature_lookahead: 140
+#         curvature_smooth_window: 5
+#         accel_rate: 4.0
+#         decel_rate: 6.0
 
-    global_planner_lidar:
-      ros__parameters:
-        waypoints_ahead: 5
-        waypoints_behind: 2
-        passed_threshold: 0.25
-        centreofgravity_to_frontaxle: 1.483
-        waypoint_search_ahead: 30
-        exploration_goal_count: 10
-        exploration_goal_step: 3.0
-        cg_to_lidar: 2.4
-        centerline_step: 3.5
-        centerline_close_dist: 4.0
-        centerline_min_points: 20
-        centerline_post_smooth_passes: 3
-        centerline_refine_passes: 3
-        racing_use_map_corridor: true
-        racing_boundary_margin: 1.0
-        racing_mincurv_max_offset: 5.0
-        racing_mincurv_iters: 8000
-        racing_smooth_alpha: 0.4
-        racing_smooth_iters: 10
-        racing_smooth_max_dev: 1.5
-        racing_smooth_pre_iters: 4
-        racing_smooth_pre_alpha: 0.4
-        racing_smooth_coarse_points: 80
-        racing_smooth_energy_ratio: 0.05
-        racing_track_half_width: 8.0
+#     global_planner_lidar:
+#       ros__parameters:
+#         waypoints_ahead: 5
+#         waypoints_behind: 2
+#         passed_threshold: 0.25
+#         centreofgravity_to_frontaxle: 1.483
+#         waypoint_search_ahead: 30
+#         exploration_goal_count: 10
+#         exploration_goal_step: 3.0
+#         cg_to_lidar: 2.4
+#         centerline_step: 3.5
+#         centerline_close_dist: 4.0
+#         centerline_min_points: 20
+#         centerline_post_smooth_passes: 3
+#         centerline_refine_passes: 3
+#         racing_use_map_corridor: true
+#         racing_boundary_margin: 1.0
+#         racing_mincurv_max_offset: 5.0
+#         racing_mincurv_iters: 8000
+#         racing_smooth_alpha: 0.4
+#         racing_smooth_iters: 10
+#         racing_smooth_max_dev: 1.5
+#         racing_smooth_pre_iters: 4
+#         racing_smooth_pre_alpha: 0.4
+#         racing_smooth_coarse_points: 80
+#         racing_smooth_energy_ratio: 0.05
+#         racing_track_half_width: 8.0
 
-    path_tracker:
-      ros__parameters:
-        update_frequency: 50.0
-        centreofgravity_to_frontaxle: 1.483
-        centreofgravity_to_rearaxle: 1.483
-        wheelbase: 2.966
-        lookahead_gain: 0.4
-        lookahead_min: 1.5
-        lookahead_max: 6.0
-        closest_search_ahead: 120
-        steering_limits: 0.95
-        steering_rate_limit: 4.0
-        steer_smoothing: 1.0
-        velocity_gain: 1.0
-        startup_ramp_s: 2.0
-        lateral_soft: 4.0
-        heading_soft: 0.6
+#     path_tracker:
+#       ros__parameters:
+#         update_frequency: 50.0
+#         centreofgravity_to_frontaxle: 1.483
+#         centreofgravity_to_rearaxle: 1.483
+#         wheelbase: 2.966
+#         lookahead_gain: 0.4
+#         lookahead_min: 1.5
+#         lookahead_max: 6.0
+#         closest_search_ahead: 120
+#         steering_limits: 0.95
+#         steering_rate_limit: 4.0
+#         steer_smoothing: 1.0
+#         velocity_gain: 1.0
+#         startup_ramp_s: 2.0
+#         lateral_soft: 4.0
+#         heading_soft: 0.6
 
 - stack: pure_pursuit_lidar
   profile: finetuned
