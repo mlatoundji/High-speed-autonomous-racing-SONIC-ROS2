@@ -50,6 +50,7 @@ Experiments progress in three stages:
 including robustness sweeps over perception latency and odometry noise.
 All raw data are archived under \texttt{results/}.
 \end{abstract}
+\newpage
 
 \tableofcontents
 \newpage
@@ -599,7 +600,7 @@ Overrides are archived under
 (\texttt{run\_000} baseline, \texttt{run\_001} finetuned;
 source config \texttt{f1\_pure\_pursuit\_lidar.yaml}).
 Unlike Stage~II, finetuning here retunes \emph{all three} navigation nodes
-(local planner, LiDAR global planner, path tracker).
+(LiDAR global planner, local planner, path tracker).
 
 \begin{table}[H]
   \centering
@@ -616,29 +617,6 @@ Unlike Stage~II, finetuning here retunes \emph{all three} navigation nodes
     Y@{}}
     \toprule
     Parameter & Baseline & Finetuned & Role \\
-    \midrule
-    \multicolumn{4}{@{}l}{\textit{local\_planner}} \\
-    \addlinespace
-    \textbf{\texttt{cruise\_velocity} /
-    \texttt{avoid\_velocity}} &
-    6.0 & \best{7.5\,m/s} &
-    Raise lap-2+ target speed; baseline was conservative for SLAM exploration. \\
-    \addlinespace
-    \texttt{max\_lateral\_accel} &
-    4.5 & 5.0 &
-    Allow slightly higher cornering speed; 5.5 was too nervous on this stack. \\
-    \addlinespace
-    \textbf{\texttt{curvature\_lookahead}} &
-    140 & \best{110} &
-    Shorten bend horizon (Stage~II used 60, but here 60 caused lap-2 speed bobbing). \\
-    \addlinespace
-    \texttt{curvature\_smooth\_window} &
-    5 & 7 &
-    Smooth cruise-velocity transitions when curvature estimate changes. \\
-    \addlinespace
-    \texttt{decel\_rate} &
-    6.0 & 6.5 &
-    Slightly faster braking into corners at higher cruise speed. \\
     \midrule
     \multicolumn{4}{@{}l}{\textit{global\_planner\_lidar}} \\
     \addlinespace
@@ -668,6 +646,29 @@ Unlike Stage~II, finetuning here retunes \emph{all three} navigation nodes
     \texttt{racing\_smooth\_pre\_alpha} &
     0.40 & 0.42 &
     Slightly stronger smoothing blend on extracted waypoints. \\
+    \midrule
+    \multicolumn{4}{@{}l}{\textit{local\_planner}} \\
+    \addlinespace
+    \textbf{\texttt{cruise\_velocity} /
+    \texttt{avoid\_velocity}} &
+    6.0 & \best{7.5\,m/s} &
+    Raise lap-2+ target speed; baseline was conservative for SLAM exploration. \\
+    \addlinespace
+    \texttt{max\_lateral\_accel} &
+    4.5 & 5.0 &
+    Allow slightly higher cornering speed; 5.5 was too nervous on this stack. \\
+    \addlinespace
+    \textbf{\texttt{curvature\_lookahead}} &
+    140 & \best{110} &
+    Shorten bend horizon (Stage~II used 60, but here 60 caused lap-2 speed bobbing). \\
+    \addlinespace
+    \texttt{curvature\_smooth\_window} &
+    5 & 7 &
+    Smooth cruise-velocity transitions when curvature estimate changes. \\
+    \addlinespace
+    \texttt{decel\_rate} &
+    6.0 & 6.5 &
+    Slightly faster braking into corners at higher cruise speed. \\
     \midrule
     \multicolumn{4}{@{}l}{\textit{path\_tracker}} \\
     \addlinespace
