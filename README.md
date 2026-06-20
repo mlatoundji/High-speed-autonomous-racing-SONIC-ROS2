@@ -2,6 +2,8 @@
 
 Projet D : robot de course autonome sur circuit (Ackermann), basé sur [AutoCarROS2](https://github.com/winstxnhdw/AutoCarROS2), **ROS 2 Humble** + Gazebo 11. Objectifs : racing line, contrôle haute vitesse, chronométrage, robustesse (latence + bruit odométrie).
 
+**Rapport projet :** [docs/Rapport_SONIC.pdf](docs/Rapport_SONIC.pdf)
+
 ## Résultats clés (F1, Albert Park ≈ 590 m)
 
 
@@ -46,6 +48,7 @@ Packages ajoutés : `autocar_nav_pure_pursuit`, `autocar_nav_pure_pursuit_lidar`
 autocar/
 ├── README.md
 ├── docs/                              # Rapports, synthèse expérimentale, figures
+│   ├── Rapport_SONIC.pdf              # Rapport projet SONIC (Projet D)
 │   ├── experimental_results.pdf
 │   └── images/
 ├── scripts/                           # Benchmark batch et analyse post-run
