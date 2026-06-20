@@ -13,6 +13,7 @@
 \usepackage{float}
 \usepackage{tabularx}
 \usepackage{array}
+\usepackage{amsmath}
 \usepackage{ragged2e}
 
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
@@ -26,7 +27,7 @@
 }
 
 \title{Autonomous Racing Navigation:\\Experimental Results Summary}
-\author{AutoCar Project}
+\author{SONIC Project}
 \date{May--June 2026}
 
 \graphicspath{{../results/}}
@@ -234,6 +235,90 @@ Stages~II--III: $T_{\mathrm{med}}$ and $\dot{\delta}_{\max}$ from post-warmup la
         $|\mathrm{d}\delta/\mathrm{d}t|$ per lap (proxy for steering oscillation).
   \item \textbf{Off-track events} --- count of boundary violations (benchmark runs only).
 \end{itemize}
+
+\subsection{Local planner curvature speed limit}
+\label{sec:local-speed}
+
+The local planner (\texttt{local\_planner}) publishes
+\texttt{/autocar/target\_velocity} at \texttt{update\_frequency} (10\,Hz).
+It caps speed from the peak curvature $\kappa_{\mathrm{peak}}$ on the cubic-spline
+path ahead of the front axle.
+Let $i$ be the closest-path index and $N_{\mathrm{cl}}$ =
+\texttt{curvature\_lookahead} (path samples, not metres; at 10\,Hz sampling
+$ds \approx 0.1$\,m per point, so $N_{\mathrm{cl}} = 110 \Rightarrow$
+${\approx}11$\,m arc length).
+The planner takes the maximum of a moving-average filtered $|\kappa|$ over
+$[i,\; i + N_{\mathrm{cl}})$ (\texttt{curvature\_smooth\_window}, default 5):
+\begin{equation}
+  \label{eq:kappa-peak}
+  \kappa_{\mathrm{peak}}
+  = \max_{j \in [i,\, i + N_{\mathrm{cl}})} \mathrm{MA}\bigl(|\kappa_j|\bigr)
+\end{equation}
+Centripetal acceleration $a_{\mathrm{lat}} = v^2 |\kappa|$ yields the
+curvature-limited speed
+\begin{equation}
+  \label{eq:v-curve}
+  v_{\mathrm{curve}}
+  = \sqrt{\frac{a_{\mathrm{lat,max}}}
+               {\max\bigl(|\kappa_{\mathrm{peak}}|,\; \kappa_{\min}\bigr)}}
+\end{equation}
+with $a_{\mathrm{lat,max}}$ = \texttt{max\_lateral\_accel} and
+$\kappa_{\min}$ = \texttt{min\_curvature} (prevents $v_{\mathrm{curve}}
+\to \infty$ on straights).
+The cruise cap depends on \texttt{nav\_mode}:
+$v_{\mathrm{cruise}} =$ \texttt{exploration\_velocity} (lap~1) or
+\texttt{cruise\_velocity} (lap~2+):
+\begin{equation}
+  \label{eq:v-target}
+  v_{\mathrm{target}} = \min\bigl(v_{\mathrm{cruise}},\; v_{\mathrm{curve}}\bigr)
+\end{equation}
+The published target is a ramped value $v_{\mathrm{pub}}$ that approaches
+$v_{\mathrm{target}}$ asymmetrically each tick ($\Delta t = 1/\texttt{update\_frequency}$)
+via \texttt{accel\_rate} / \texttt{decel\_rate}; the path tracker follows
+$v_{\mathrm{pub}}$ (with optional error-based scaling).
+Example (Stage~II finetuned, $a_{\mathrm{lat,max}} = 5.5$\,m/s$^2$,
+$|\kappa_{\mathrm{peak}}| = 0.10$\,m$^{-1}$):
+$v_{\mathrm{curve}} \approx \sqrt{5.5/0.10} \approx 7.4$\,m/s;
+with $v_{\mathrm{cruise}} = 8.0$\,m/s, Eq.~\ref{eq:v-target} gives
+$v_{\mathrm{target}} = 7.4$\,m/s.
+
+\subsection{Pure Pursuit lookahead distance}
+\label{sec:pp-lookahead}
+
+The path tracker (\texttt{path\_tracker}) sets the arc-length lookahead
+$L_d^{\mathrm{final}}$ (m) each control cycle from the \emph{measured} speed $v$
+and the peak path curvature $\kappa_{\mathrm{peak}}$ over the segment ahead of the
+closest point (\texttt{lookahead\_curv\_window}, default 30 path samples):
+\begin{equation}
+  \label{eq:ld-base}
+  L_d = \mathrm{clip}\bigl(g_{\mathrm{ld}}\, v + L_{\min},\; L_{\min},\; L_{\max}\bigr)
+\end{equation}
+\begin{equation}
+  \label{eq:ld-scale}
+  \mathrm{scale}(\kappa_{\mathrm{peak}})
+  = \frac{1}{1 + \bigl(|\kappa_{\mathrm{peak}}| / \kappa_{\mathrm{soft}}\bigr)^2}
+\end{equation}
+\begin{equation}
+  \label{eq:ld-final}
+  L_d^{\mathrm{final}}
+  = L_d + L_{\mathrm{curv\_extra}}\,
+    \mathrm{scale}(\kappa_{\mathrm{peak}})
+\end{equation}
+\noindent
+Mapping to ROS parameters:
+$g_{\mathrm{ld}}$ = \texttt{lookahead\_gain},
+$L_{\min}$ / $L_{\max}$ = \texttt{lookahead\_min} / \texttt{lookahead\_max},
+$L_{\mathrm{curv\_extra}}$ = \texttt{lookahead\_curv\_extra}
+(0\,m disables the curvature-adaptive term; baseline Stage~II/III),
+$\kappa_{\mathrm{soft}}$ = \texttt{lookahead\_curv\_soft}.
+On straights $\mathrm{scale} \approx 1$; in sharp bends $\mathrm{scale} \to 0$,
+so the extra term lengthens lookahead only on straight segments (anti-zigzag)
+without cutting corners.
+Example (Stage~III finetuned, $v = 7.5$\,m/s):
+$g_{\mathrm{ld}} = 0.48$, $L_{\min} = 1.8$\,m, $L_{\max} = 8.0$\,m
+$\Rightarrow L_d \approx 5.4$\,m (Eq.~\ref{eq:ld-base});
+with $L_{\mathrm{curv\_extra}} = 4.0$\,m on a straight,
+$L_d^{\mathrm{final}} \approx 9.4$\,m (Eq.~\ref{eq:ld-final}).
 
 \subsection{Recording conventions}
 Manual launches write per-lap records to \texttt{results/<stack>\_<run\_id>/lap\_times.csv}
@@ -498,7 +583,8 @@ different tuning set.
     \addlinespace
     \texttt{curvature\_lookahead} &
     140 & 60 & 60 &
-    Shorter bend-detection horizon on the twisty F1 layout:
+    Shorter bend-detection horizon on the twisty F1 layout
+    (Eqs.~\ref{eq:kappa-peak}--\ref{eq:v-target}):
     brake later instead of treating the whole circuit as one continuous corner. \\
     \addlinespace
     \texttt{heading\_soft} &
@@ -656,11 +742,13 @@ Unlike Stage~II, finetuning here retunes \emph{all three} navigation nodes
     \addlinespace
     \texttt{max\_lateral\_accel} &
     4.5 & 5.0 &
-    Allow slightly higher cornering speed; 5.5 was too nervous on this stack. \\
+    Allow slightly higher cornering speed (Eq.~\ref{eq:v-curve});
+    5.5 was too nervous on this stack. \\
     \addlinespace
     \textbf{\texttt{curvature\_lookahead}} &
     140 & \best{110} &
-    Shorten bend horizon (Stage~II used 60, but here 60 caused lap-2 speed bobbing). \\
+    Shorten bend horizon (Eqs.~\ref{eq:kappa-peak}--\ref{eq:v-target};
+    Stage~II used 60, but here 60 caused lap-2 speed bobbing). \\
     \addlinespace
     \texttt{curvature\_smooth\_window} &
     5 & 7 &
@@ -676,7 +764,8 @@ Unlike Stage~II, finetuning here retunes \emph{all three} navigation nodes
     \texttt{lookahead\_min} /
     \texttt{lookahead\_max}} &
     0.4 / 1.5 / 6.0 & \best{0.48 / 1.8 / 8.0} &
-    Longer adaptive lookahead at 7.5\,m/s ($L_d \approx 5.4$\,m) to cut zigzag. \\
+    Longer adaptive lookahead at 7.5\,m/s ($L_d \approx 5.4$\,m,
+    Eq.~\ref{eq:ld-base}) to cut zigzag. \\
     \addlinespace
     \textbf{\texttt{lookahead\_curv\_extra}} &
     0 & \best{4.0\,m} &
